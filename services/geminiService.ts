@@ -1,6 +1,13 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Activity, FocusArea } from "../types";
 
+// Helper to prevent TypeScript build errors regarding 'process'
+declare const process: {
+  env: {
+    API_KEY: string;
+  };
+};
+
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const generateActivities = async (
