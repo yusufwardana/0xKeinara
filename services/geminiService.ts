@@ -46,7 +46,9 @@ export const generateActivities = async (
 
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
-      contents: `Berikan 3 aktivitas stimulasi yang menyenangkan, aman, dan mendidik untuk bayi usia ${ageMonths} bulan dengan fokus pada ${focusArea}.
+      contents: `Analisis tahap perkembangan bayi usia ${ageMonths} bulan secara mendalam.
+      Berikan 3 aktivitas stimulasi yang sangat spesifik, aman, dan edukatif dengan fokus pada ${focusArea}.
+      Gunakan penalaran "Thinking Mode" untuk memastikan aktivitas benar-benar sesuai dengan kemampuan motorik dan kognitif bayi pada bulan ke-${ageMonths}, jangan berikan aktivitas yang terlalu sulit atau terlalu mudah.
       Pastikan instruksi jelas dan menggunakan barang-barang rumah tangga yang sederhana. Bahasa Indonesia.`,
       config: config
     });

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Activity, FocusArea } from '../types';
 import { generateActivities } from '../services/geminiService';
-import { Loader2, Sparkles, BookOpen, Clock, ShieldCheck, Bookmark, History, Trash2, ArrowLeft } from 'lucide-react';
+import { Loader2, Sparkles, BookOpen, Clock, ShieldCheck, Bookmark, History, Trash2, ArrowLeft, Brain } from 'lucide-react';
 
 interface Props {
   babyAge: number;
@@ -200,8 +200,8 @@ const ActivityGenerator: React.FC<Props> = ({ babyAge }) => {
           >
             {loading ? (
               <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                Sedang Meracik Ide...
+                <Brain className="w-5 h-5 animate-pulse" />
+                <span className="animate-pulse">AI Sedang Berpikir...</span>
               </>
             ) : (
               'Buat Rencana Main'
