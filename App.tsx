@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Baby, Activity as ActivityIcon, ListChecks, Eye, Settings, Calendar, User, MessageCircle } from 'lucide-react';
+import { Baby, Activity as ActivityIcon, ListChecks, Eye, Settings, Calendar, User, MessageCircle, Scale } from 'lucide-react';
 import ActivityGenerator from './components/ActivityGenerator';
 import VisualStimulator from './components/VisualStimulator';
 import MilestoneTracker from './components/MilestoneTracker';
+import GrowthTracker from './components/GrowthTracker';
 import ChatAssistant from './components/ChatAssistant';
 import { calculateAge, AgeDetail } from './utils/ageCalculator';
+import { Gender } from './types';
 
-type View = 'activities' | 'visual' | 'milestones';
+type View = 'activities' | 'visual' | 'milestones' | 'growth';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('activities');
@@ -14,6 +16,7 @@ const App: React.FC = () => {
   // Profile State
   const [babyName, setBabyName] = useState('Keinara');
   const [birthDate, setBirthDate] = useState<string>('');
+  const [gender, setGender] = useState<Gender>('Perempuan'); // Default
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [ageDetail, setAgeDetail] = useState<AgeDetail>({ months: 6, days: 0, totalDays: 180, display: '6 Bulan' });
 
@@ -24,8 +27,10 @@ const App: React.FC = () => {
   useEffect(() => {
     const savedName = localStorage.getItem('keinara_profile_name');
     const savedDate = localStorage.getItem('keinara_profile_dob');
+    const savedGender = localStorage.getItem('keinara_profile_gender');
     
     if (savedName) setBabyName(savedName);
+    if (savedGender) setGender(savedGender as Gender);
     if (savedDate) {
       setBirthDate(savedDate);
       setAgeDetail(calculateAge(savedDate));
@@ -39,6 +44,7 @@ const App: React.FC = () => {
     e.preventDefault();
     localStorage.setItem('keinara_profile_name', babyName);
     localStorage.setItem('keinara_profile_dob', birthDate);
+    localStorage.setItem('keinara_profile_gender', gender);
     setAgeDetail(calculateAge(birthDate));
     setIsEditingProfile(false);
   };
@@ -72,6 +78,18 @@ const App: React.FC = () => {
                     placeholder="Contoh: Keinara"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Jenis Kelamin</label>
+                <select 
+                    value={gender}
+                    onChange={(e) => setGender(e.target.value as Gender)}
+                    className="w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-orange-400 outline-none bg-white"
+                >
+                    <option value="Laki-laki">Laki-laki</option>
+                    <option value="Perempuan">Perempuan</option>
+                </select>
               </div>
               
               <div>
@@ -172,6 +190,20 @@ const App: React.FC = () => {
               <MilestoneTracker babyAge={ageDetail.months || 3} />
             </div>
           )}
+
+          {currentView === 'growth' && (
+             <div>
+               <div className="mb-6">
+                  <h2 className="text-2xl font-bold text-gray-800">Pelacak Pertumbuhan</h2>
+                  <p className="text-gray-500">Catat dan analisis berat serta tinggi badan {babyName}.</p>
+              </div>
+              <GrowthTracker 
+                babyName={babyName}
+                gender={gender}
+                birthDate={birthDate}
+              />
+            </div>
+          )}
         </div>
       </main>
 
@@ -196,30 +228,38 @@ const App: React.FC = () => {
       )}
 
       {/* Bottom Navigation (Mobile First) */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 py-3 md:hidden shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-40">
-        <div className="flex justify-between items-center max-w-sm mx-auto">
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-2 py-3 md:hidden shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-40">
+        <div className="flex justify-between items-center max-w-sm mx-auto gap-1">
           <button 
             onClick={() => setCurrentView('activities')}
-            className={`flex flex-col items-center gap-1 ${currentView === 'activities' ? 'text-blue-600' : 'text-gray-400'}`}
+            className={`flex flex-col items-center gap-1 w-16 ${currentView === 'activities' ? 'text-blue-600' : 'text-gray-400'}`}
           >
-            <ActivityIcon className="w-6 h-6" />
-            <span className="text-xs font-medium">Aktivitas</span>
+            <ActivityIcon className="w-5 h-5" />
+            <span className="text-[10px] font-medium">Main</span>
           </button>
           
           <button 
             onClick={() => setCurrentView('visual')}
-            className={`flex flex-col items-center gap-1 ${currentView === 'visual' ? 'text-orange-600' : 'text-gray-400'}`}
+            className={`flex flex-col items-center gap-1 w-16 ${currentView === 'visual' ? 'text-orange-600' : 'text-gray-400'}`}
           >
-            <Eye className="w-6 h-6" />
-            <span className="text-xs font-medium">Visual</span>
+            <Eye className="w-5 h-5" />
+            <span className="text-[10px] font-medium">Visual</span>
           </button>
 
           <button 
             onClick={() => setCurrentView('milestones')}
-            className={`flex flex-col items-center gap-1 ${currentView === 'milestones' ? 'text-green-600' : 'text-gray-400'}`}
+            className={`flex flex-col items-center gap-1 w-16 ${currentView === 'milestones' ? 'text-green-600' : 'text-gray-400'}`}
           >
-            <ListChecks className="w-6 h-6" />
-            <span className="text-xs font-medium">Milestone</span>
+            <ListChecks className="w-5 h-5" />
+            <span className="text-[10px] font-medium">Milestone</span>
+          </button>
+
+          <button 
+            onClick={() => setCurrentView('growth')}
+            className={`flex flex-col items-center gap-1 w-16 ${currentView === 'growth' ? 'text-purple-600' : 'text-gray-400'}`}
+          >
+            <Scale className="w-5 h-5" />
+            <span className="text-[10px] font-medium">Tumbuh</span>
           </button>
         </div>
       </nav>
@@ -243,6 +283,12 @@ const App: React.FC = () => {
             className={`px-6 py-2 rounded-full font-medium transition-colors ${currentView === 'milestones' ? 'bg-green-100 text-green-700' : 'text-gray-600 hover:bg-gray-50'}`}
           >
             Milestone
+          </button>
+          <button 
+            onClick={() => setCurrentView('growth')}
+            className={`px-6 py-2 rounded-full font-medium transition-colors ${currentView === 'growth' ? 'bg-purple-100 text-purple-700' : 'text-gray-600 hover:bg-gray-50'}`}
+          >
+            Tumbuh
           </button>
       </div>
     </div>

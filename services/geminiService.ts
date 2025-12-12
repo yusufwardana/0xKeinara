@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { Activity, FocusArea } from "../types";
+import { Activity, FocusArea, GrowthRecord } from "../types";
 
 // Helper to prevent TypeScript build errors regarding 'process'
 declare const process: {
@@ -125,5 +125,54 @@ export const sendMessageToAssistant = async (
   } catch (error) {
     console.error("Chat Error", error);
     return "Maaf Bunda, koneksi saya sedang gangguan. Bisa diulang lagi?";
+  }
+};
+
+// --- NEW: Growth Analysis Logic (Using Thinking Model) ---
+export const analyzeGrowth = async (
+  records: GrowthRecord[],
+  babyName: string,
+  gender: string,
+  birthDate: string
+): Promise<string> => {
+  if (records.length === 0) return "Belum ada data pertumbuhan untuk dianalisis.";
+
+  // Format records for the prompt
+  const recordsStr = records
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    .map(r => `- Tanggal: ${r.date}, Berat: ${r.weight}kg, Tinggi: ${r.height}cm`)
+    .join('\n');
+
+  try {
+    // Using gemini-3-pro-preview with Thinking Mode for complex health data analysis
+    const response = await ai.models.generateContent({
+      model: "gemini-3-pro-preview",
+      contents: `Analisis data pertumbuhan bayi berikut ini secara mendalam.
+      
+      Profil:
+      - Nama: ${babyName}
+      - Jenis Kelamin: ${gender}
+      - Tanggal Lahir: ${birthDate}
+      
+      Data Pertumbuhan:
+      ${recordsStr}
+      
+      Tugas:
+      1. Bandingkan tren pertumbuhan ini dengan standar WHO (Weight-for-age dan Length-for-age) secara umum. Apakah grafiknya naik stabil, stagnan, atau turun?
+      2. Berikan penilaian status gizi singkat (misal: Pertumbuhan baik, Perlu perhatian, dll) berdasarkan data terakhir.
+      3. Berikan 3 saran nutrisi atau pola makan (jika sudah MPASI) dan stimulasi fisik yang relevan dengan kondisi pertumbuhan ini.
+      
+      Gunakan bahasa yang menenangkan, suportif, dan mudah dipahami orang tua. Jangan mendiagnosis medis secara definitif, tapi sarankan konsultasi ke dokter jika ada tanda bahaya (red flag).`,
+      config: {
+        thinkingConfig: {
+          thinkingBudget: 32768, // High budget for careful analysis of health data
+        }
+      }
+    });
+
+    return response.text || "Gagal menganalisis data.";
+  } catch (error) {
+    console.error("Growth Analysis Error", error);
+    return "Maaf, sistem sedang sibuk. Silakan coba analisis lagi nanti.";
   }
 };

@@ -35,3 +35,13 @@ export interface ChatMessage {
   text: string;
   timestamp: Date;
 }
+
+export interface GrowthRecord {
+  id: string;
+  date: string;
+  weight: number; // in kg
+  height: number; // in cm
+  notes?: string;
+}
+
+export type Gender = 'Laki-laki' | 'Perempuan';
