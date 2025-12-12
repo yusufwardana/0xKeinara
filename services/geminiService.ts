@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type, HarmCategory, HarmBlockThreshold } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { Activity, FocusArea, GrowthRecord } from "../types";
 
 // Helper to prevent TypeScript build errors regarding 'process'
@@ -10,34 +10,28 @@ declare const process: {
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-// --- Activity Generator Logic ---
-// UPDATED: Root is now an OBJECT with an 'activities' array. This is more stable for LLMs.
+// --- Existing Generator Logic ---
 const activitySchema = {
-  type: Type.OBJECT,
-  properties: {
-    activities: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          title: { type: Type.STRING, description: "Judul aktivitas" },
-          duration: { type: Type.STRING, description: "Durasi (cth: 5-10 menit)" },
-          materials: {
-            type: Type.ARRAY,
-            items: { type: Type.STRING },
-            description: "Alat/bahan"
-          },
-          instructions: {
-            type: Type.ARRAY,
-            items: { type: Type.STRING },
-            description: "Langkah-langkah"
-          },
-          benefits: { type: Type.STRING, description: "Manfaat tumbuh kembang" },
-          safetyTip: { type: Type.STRING, description: "Tips keamanan" }
-        },
-        required: ["title", "duration", "materials", "instructions", "benefits", "safetyTip"]
-      }
-    }
+  type: Type.ARRAY,
+  items: {
+    type: Type.OBJECT,
+    properties: {
+      title: { type: Type.STRING, description: "Judul aktivitas yang menarik" },
+      duration: { type: Type.STRING, description: "Perkiraan durasi (misal: 5-10 menit)" },
+      materials: {
+        type: Type.ARRAY,
+        items: { type: Type.STRING },
+        description: "Daftar alat/bahan yang dibutuhkan"
+      },
+      instructions: {
+        type: Type.ARRAY,
+        items: { type: Type.STRING },
+        description: "Langkah-langkah melakukan aktivitas"
+      },
+      benefits: { type: Type.STRING, description: "Manfaat perkembangan bagi bayi (jelaskan aspek neurosains/motorik)" },
+      safetyTip: { type: Type.STRING, description: "Tips keamanan spesifik untuk aktivitas ini" }
+    },
+    required: ["title", "duration", "materials", "instructions", "benefits", "safetyTip"]
   }
 };
 
@@ -48,90 +42,31 @@ export const generateActivities = async (
 ): Promise<Activity[]> => {
   
   const ageContext = exactAgeDisplay ? `tepatnya ${exactAgeDisplay}` : `${ageMonths} bulan`;
-  const prompt = `Bertindaklah sebagai ahli perkembangan anak.
-      Subjek: Bayi usia ${ageContext}.
-      Tugas: Buat 3 rekomendasi aktivitas stimulasi untuk *hari ini* dengan fokus: ${focusArea}.
-      
-      Syarat:
-      1. Gunakan barang rumah tangga sederhana.
-      2. Aman dan menyenangkan.
-      3. Bahasa Indonesia.
-      
-      FORMAT OUTPUT: JSON Object dengan property "activities" yang berisi array aktivitas.`;
-
-  // Standard safety settings to prevent false positives on "baby physical activities"
-  const safetySettings = [
-    { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-    { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-    { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-    { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH }
-  ];
 
   try {
-    // Attempt 1: Gemini 2.5 Flash with Object Schema
+    // Using standard flash model for reliability and speed in generating JSON
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: prompt,
+      contents: `Bertindaklah sebagai ahli perkembangan anak pribadi untuk bayi bernama Keinara.
+      Saat ini usianya ${ageContext}.
+      Berikan 3 rekomendasi aktivitas stimulasi untuk *hari ini* dengan fokus pada ${focusArea}.
+      
+      Panduan:
+      1. Aktivitas harus menggunakan barang rumah tangga sederhana.
+      2. Jelaskan manfaatnya dari sudut pandang perkembangan saraf atau otot.
+      
+      Bahasa Indonesia. Keluarkan output HANYA JSON array sesuai schema.`,
       config: { 
         responseMimeType: "application/json", 
-        responseSchema: activitySchema,
-        safetySettings: safetySettings
+        responseSchema: activitySchema 
       }
     });
 
     if (response.text) {
-      let jsonString = response.text.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
-      
-      // Try to find the JSON object if there's extra text
-      const firstBrace = jsonString.indexOf('{');
-      const lastBrace = jsonString.lastIndexOf('}');
-      if (firstBrace !== -1 && lastBrace !== -1) {
-        jsonString = jsonString.substring(firstBrace, lastBrace + 1);
-      }
-
-      const parsed = JSON.parse(jsonString);
-      
-      // Handle wrapped object (Schema compliant)
-      if (parsed.activities && Array.isArray(parsed.activities)) {
-        return parsed.activities;
-      }
-      // Handle if model returned direct array (Non-compliant but possible)
-      if (Array.isArray(parsed)) {
-        return parsed;
-      }
+      return JSON.parse(response.text) as Activity[];
     }
   } catch (error) {
-    console.warn("Attempt 1 (Schema) failed, retrying with simple prompt...", error);
-    try {
-        // Attempt 2: Fallback without strict schema, asking for raw JSON
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: prompt + "\n\nKeluarkan HANYA raw JSON string valid. Jangan ada markdown ```.",
-            config: { 
-                responseMimeType: "application/json",
-                safetySettings: safetySettings
-            }
-        });
-
-        if (response.text) {
-            let jsonString = response.text.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
-             const firstBrace = jsonString.indexOf('{');
-            const lastBrace = jsonString.lastIndexOf('}');
-            if (firstBrace !== -1 && lastBrace !== -1) {
-                jsonString = jsonString.substring(firstBrace, lastBrace + 1);
-            }
-
-            const parsed = JSON.parse(jsonString);
-            if (parsed.activities && Array.isArray(parsed.activities)) {
-                return parsed.activities;
-            }
-            if (Array.isArray(parsed)) {
-                return parsed;
-            }
-        }
-    } catch (e2) {
-        console.error("All generateActivity attempts failed", e2);
-    }
+    console.error("Generate Activity Error", error);
   }
   return [];
 };
@@ -178,46 +113,56 @@ export const sendMessageToAssistant = async (
     return result.text;
   } catch (error) {
     console.error("Chat Error", error);
-    chatSession = null;
-    return "Maaf Bunda, koneksi saya sedang gangguan. Boleh diulang pertanyaannya?";
+    return "Maaf Bunda, koneksi saya sedang gangguan. Bisa diulang lagi?";
   }
 };
 
-// --- Growth Analysis Logic ---
+// --- NEW: Growth Analysis Logic (Using Gemini 3 Pro Thinking) ---
 export const analyzeGrowth = async (
   records: GrowthRecord[],
   babyName: string,
   gender: string,
   birthDate: string
 ): Promise<string> => {
-  if (!records || records.length === 0) return "Belum ada data pertumbuhan untuk dianalisis.";
+  if (records.length === 0) return "Belum ada data pertumbuhan untuk dianalisis.";
 
-  // Sort chronological for context
-  const history = [...records]
+  // Format records for the prompt
+  const recordsStr = records
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-    .map(r => `- Tanggal ${r.date}: Berat ${r.weight}kg, Tinggi ${r.height}cm`)
+    .map(r => `- Tanggal: ${r.date}, Berat: ${r.weight}kg, Tinggi: ${r.height}cm`)
     .join('\n');
 
   try {
+    // Using gemini-3-pro-preview with MAX Thinking Budget for deep health analysis
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: `
-        Anda adalah konsultan tumbuh kembang anak profesional namun ramah.
-        Subjek: Bayi bernama ${babyName}, Jenis Kelamin: ${gender}, Tanggal Lahir: ${birthDate}.
-        
-        Data Riwayat Pertumbuhan:
-        ${history}
-        
-        Tugas:
-        1. Analisis tren pertumbuhan secara singkat (apakah naik stabil, turun, atau ada lonjakan).
-        2. Berikan komentar penyemangat atau saran jika ada yang perlu diperhatikan (tetap sarankan konsultasi dokter untuk diagnosa medis).
-        3. Sertakan 1 tips nutrisi atau aktivitas fisik singkat yang relevan dengan data terakhir.
-        4. Gunakan Bahasa Indonesia yang hangat. Maksimal 150 kata.
-      `,
+      model: "gemini-3-pro-preview",
+      contents: `Analisis data pertumbuhan bayi berikut ini secara mendalam.
+      
+      Profil:
+      - Nama: ${babyName}
+      - Jenis Kelamin: ${gender}
+      - Tanggal Lahir: ${birthDate}
+      
+      Data Pertumbuhan:
+      ${recordsStr}
+      
+      Tugas:
+      1. Bandingkan tren pertumbuhan ini dengan standar kurva WHO (Weight-for-age dan Length-for-age) secara umum. Apakah grafiknya naik stabil, stagnan, atau turun?
+      2. Berikan penilaian status gizi singkat (misal: Pertumbuhan baik, Perlu perhatian, dll) berdasarkan data terakhir.
+      3. Berikan 3 saran nutrisi atau pola makan (jika sudah MPASI) dan stimulasi fisik yang relevan dengan kondisi pertumbuhan ini.
+      
+      Gunakan bahasa yang menenangkan, suportif, dan mudah dipahami orang tua. Jangan mendiagnosis medis secara definitif, tapi sarankan konsultasi ke dokter jika ada tanda bahaya (red flag).`,
+      config: {
+        thinkingConfig: {
+          thinkingBudget: 32768, // Max budget for gemini 3 pro
+        }
+        // maxOutputTokens is intentionally NOT set to allow full thinking output
+      }
     });
-    return response.text || "Tidak dapat memuat analisis saat ini.";
+
+    return response.text || "Gagal menganalisis data.";
   } catch (error) {
     console.error("Growth Analysis Error", error);
-    return "Maaf, terjadi kesalahan saat menghubungi layanan AI untuk analisis.";
+    return "Maaf, sistem sedang sibuk atau model thinking sedang limit. Silakan coba lagi nanti.";
   }
 };
