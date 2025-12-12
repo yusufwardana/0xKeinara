@@ -7,38 +7,17 @@ interface Props {
   babyAge: number;
 }
 
-// Expanded milestones covering 3-12 months with focus on Cognitive and Social
+// Static basic milestones to ensure app works without AI initially, 
+// could be expanded dynamically if needed.
 const BASE_MILESTONES: Milestone[] = [
-  // 3-6 Bulan
-  { id: '1', ageRange: '3-6', category: FocusArea.MOTOR_KASAR, description: 'Mengangkat kepala dan dada saat tengkurap', checked: false },
+  { id: '1', ageRange: '3-6', category: FocusArea.MOTOR_KASAR, description: 'Mengangkat kepala saat tengkurap', checked: false },
   { id: '2', ageRange: '3-6', category: FocusArea.SOSIAL, description: 'Tersenyum spontan pada orang lain', checked: false },
-  { id: '3', ageRange: '3-6', category: FocusArea.KOMUNIKASI, description: 'Menoleh ke arah suara keras', checked: false },
-  { id: '4', ageRange: '3-6', category: FocusArea.KOGNITIF, description: 'Memperhatikan tangan sendiri', checked: false },
-  { id: '5', ageRange: '3-6', category: FocusArea.MOTOR_HALUS, description: 'Meraih dan menggenggam mainan', checked: false },
-  { id: '6', ageRange: '3-6', category: FocusArea.SOSIAL, description: 'Tertawa keras atau memekik kegirangan', checked: false },
-  { id: '7', ageRange: '3-6', category: FocusArea.KOGNITIF, description: 'Mulai memasukkan benda ke mulut untuk eksplorasi', checked: false },
-  { id: '8', ageRange: '3-6', category: FocusArea.KOMUNIKASI, description: 'Mengeluarkan suara vokal (oooh, aaah)', checked: false },
-
-  // 6-9 Bulan
-  { id: '9', ageRange: '6-9', category: FocusArea.MOTOR_KASAR, description: 'Duduk tanpa sandaran', checked: false },
-  { id: '10', ageRange: '6-9', category: FocusArea.MOTOR_HALUS, description: 'Memindahkan benda dari satu tangan ke tangan lain', checked: false },
-  { id: '11', ageRange: '6-9', category: FocusArea.SOSIAL, description: 'Mengenali wajah familiar vs orang asing (Stranger Anxiety)', checked: false },
-  { id: '12', ageRange: '6-9', category: FocusArea.KOGNITIF, description: 'Mencari benda yang dijatuhkan (Object Permanence awal)', checked: false },
-  { id: '13', ageRange: '6-9', category: FocusArea.KOMUNIKASI, description: 'Mengoceh (babbling) dengan gabungan konsonan-vokal', checked: false },
-  { id: '14', ageRange: '6-9', category: FocusArea.SOSIAL, description: 'Merespons ketika namanya dipanggil', checked: false },
-  { id: '15', ageRange: '6-9', category: FocusArea.KOGNITIF, description: 'Bermain cilukba sederhana', checked: false },
-  { id: '16', ageRange: '6-9', category: FocusArea.MOTOR_KASAR, description: 'Berguling dari telentang ke tengkurap dan sebaliknya', checked: false },
-
-  // 9-12 Bulan
-  { id: '17', ageRange: '9-12', category: FocusArea.MOTOR_KASAR, description: 'Merangkak atau merayap dengan lancar', checked: false },
-  { id: '18', ageRange: '9-12', category: FocusArea.KOMUNIKASI, description: 'Meniru suara sederhana (ma-ma, da-da) dengan makna', checked: false },
-  { id: '19', ageRange: '9-12', category: FocusArea.KOGNITIF, description: 'Memahami instruksi sederhana (misal: "jangan", "sini")', checked: false },
-  { id: '20', ageRange: '9-12', category: FocusArea.MOTOR_KASAR, description: 'Berdiri sambil berpegangan (cruising)', checked: false },
-  { id: '21', ageRange: '9-12', category: FocusArea.SOSIAL, description: 'Melambaikan tangan (dadah) atau tepuk tangan', checked: false },
-  { id: '22', ageRange: '9-12', category: FocusArea.MOTOR_HALUS, description: 'Menjumput benda kecil dengan ibu jari dan telunjuk (pincer grasp)', checked: false },
-  { id: '23', ageRange: '9-12', category: FocusArea.KOGNITIF, description: 'Mengetahui fungsi benda (sisir rambut, cangkir minum)', checked: false },
-  { id: '24', ageRange: '9-12', category: FocusArea.SOSIAL, description: 'Menunjukkan keinginan dengan menunjuk', checked: false },
-  { id: '25', ageRange: '9-12', category: FocusArea.KOGNITIF, description: 'Menaruh benda ke dalam wadah dan mengeluarkannya', checked: false }
+  { id: '3', ageRange: '3-6', category: FocusArea.KOMUNIKASI, description: 'Menoleh ke arah suara', checked: false },
+  { id: '4', ageRange: '6-9', category: FocusArea.MOTOR_KASAR, description: 'Duduk tanpa sandaran', checked: false },
+  { id: '5', ageRange: '6-9', category: FocusArea.MOTOR_HALUS, description: 'Memindahkan benda dari satu tangan ke tangan lain', checked: false },
+  { id: '6', ageRange: '9-12', category: FocusArea.MOTOR_KASAR, description: 'Merangkak atau merayap', checked: false },
+  { id: '7', ageRange: '9-12', category: FocusArea.KOMUNIKASI, description: 'Meniru suara sederhana (ma-ma, da-da)', checked: false },
+  { id: '8', ageRange: '9-12', category: FocusArea.KOGNITIF, description: 'Memahami konsep "tidak" (meski kadang melanggar)', checked: false },
 ];
 
 const MilestoneTracker: React.FC<Props> = ({ babyAge }) => {
