@@ -207,7 +207,7 @@ const GrowthTracker: React.FC<Props> = ({ babyName, gender, birthDate }) => {
                 {analysis}
             </div>
             <p className="text-xs text-gray-400 mt-4 italic">
-                *Analisis menggunakan Gemini 3 Pro Thinking Mode untuk membandingkan dengan data umum. Bukan pengganti diagnosis medis.
+                *Analisis menggunakan Gemini AI untuk membandingkan dengan data umum. Bukan pengganti diagnosis medis.
             </p>
         </div>
       )}

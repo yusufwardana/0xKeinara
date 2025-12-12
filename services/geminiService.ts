@@ -100,7 +100,7 @@ export const getMilestoneAdvice = async (ageMonths: number): Promise<string> => 
   }
 }
 
-// --- Chat Assistant Logic (Enhanced with Thinking Mode) ---
+// --- Chat Assistant Logic ---
 let chatSession: any = null;
 
 export const sendMessageToAssistant = async (
@@ -111,21 +111,17 @@ export const sendMessageToAssistant = async (
   try {
     if (!chatSession) {
       chatSession = ai.chats.create({
-        model: "gemini-3-pro-preview", // Upgraded to Thinking Model for complex parenting advice
+        model: "gemini-2.5-flash",
         config: {
-          thinkingConfig: {
-             thinkingBudget: 32768, // Max thinking budget for deep reasoning
-          },
           systemInstruction: `Anda adalah Dokter Anak AI yang ramah dan empatik bernama "Keinara Bot". 
           Anda sedang berbicara dengan orang tua dari bayi bernama ${babyName}, yang saat ini berusia ${ageDisplay}.
           
           Tugas Anda:
           1. Menjawab pertanyaan seputar tumbuh kembang, kesehatan ringan, nutrisi, dan pola tidur.
-          2. Gunakan "Thinking Mode" anda untuk menganalisis konteks pertanyaan sebelum menjawab, terutama untuk masalah perilaku atau gejala kesehatan.
-          3. Selalu gunakan nada bicara yang menenangkan dan suportif.
-          4. Jika pertanyaan bersifat medis darurat (demam tinggi, sesak napas, cedera), Anda WAJIB menyarankan untuk segera ke dokter asli.
-          5. Jawaban harus ringkas namun informatif (maksimal 3 paragraf).
-          6. Gunakan Bahasa Indonesia yang baik dan gaul sedikit agar akrab (bunda/ayah).`,
+          2. Selalu gunakan nada bicara yang menenangkan dan suportif.
+          3. Jika pertanyaan bersifat medis darurat (demam tinggi, sesak napas, cedera), Anda WAJIB menyarankan untuk segera ke dokter asli.
+          4. Jawaban harus ringkas namun informatif (maksimal 3 paragraf).
+          5. Gunakan Bahasa Indonesia yang baik dan gaul sedikit agar akrab (bunda/ayah).`,
         },
       });
     }
@@ -136,11 +132,11 @@ export const sendMessageToAssistant = async (
     console.error("Chat Error", error);
     // Reset session on error to clear potentially stuck state
     chatSession = null;
-    return "Maaf Bunda, saya sedang berpikir terlalu keras dan koneksi terputus. Boleh diulang pertanyaannya?";
+    return "Maaf Bunda, saya sedang mengalami gangguan koneksi. Boleh diulang pertanyaannya?";
   }
 };
 
-// --- Growth Analysis Logic (Using Gemini 3 Pro Thinking) ---
+// --- Growth Analysis Logic ---
 export const analyzeGrowth = async (
   records: GrowthRecord[],
   babyName: string,
@@ -156,10 +152,9 @@ export const analyzeGrowth = async (
     .join('\n');
 
   try {
-    // Using gemini-3-pro-preview with MAX Thinking Budget for deep health analysis
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
-      contents: `Analisis data pertumbuhan bayi berikut ini secara mendalam.
+      model: "gemini-2.5-flash",
+      contents: `Analisis data pertumbuhan bayi berikut ini.
       
       Profil:
       - Nama: ${babyName}
@@ -175,17 +170,11 @@ export const analyzeGrowth = async (
       3. Berikan 3 saran nutrisi atau pola makan (jika sudah MPASI) dan stimulasi fisik yang relevan dengan kondisi pertumbuhan ini.
       
       Gunakan bahasa yang menenangkan, suportif, dan mudah dipahami orang tua. Jangan mendiagnosis medis secara definitif, tapi sarankan konsultasi ke dokter jika ada tanda bahaya (red flag).`,
-      config: {
-        thinkingConfig: {
-          thinkingBudget: 32768, // Max budget for gemini 3 pro
-        }
-        // Do not set maxOutputTokens to allow full thinking output
-      }
     });
 
     return response.text || "Gagal menganalisis data.";
   } catch (error) {
     console.error("Growth Analysis Error", error);
-    return "Maaf, sistem sedang sibuk atau model thinking sedang limit. Silakan coba lagi nanti.";
+    return "Maaf, sistem sedang sibuk. Silakan coba lagi nanti.";
   }
 };
