@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, HarmCategory, HarmBlockThreshold } from "@google/genai";
 import { Activity, FocusArea, GrowthRecord } from "../types";
 
 // Helper to prevent TypeScript build errors regarding 'process'
@@ -11,27 +11,33 @@ declare const process: {
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // --- Activity Generator Logic ---
+// UPDATED: Root is now an OBJECT with an 'activities' array. This is more stable for LLMs.
 const activitySchema = {
-  type: Type.ARRAY,
-  items: {
-    type: Type.OBJECT,
-    properties: {
-      title: { type: Type.STRING, description: "Judul aktivitas yang menarik" },
-      duration: { type: Type.STRING, description: "Perkiraan durasi (misal: 5-10 menit)" },
-      materials: {
-        type: Type.ARRAY,
-        items: { type: Type.STRING },
-        description: "Daftar alat/bahan yang dibutuhkan"
-      },
-      instructions: {
-        type: Type.ARRAY,
-        items: { type: Type.STRING },
-        description: "Langkah-langkah melakukan aktivitas"
-      },
-      benefits: { type: Type.STRING, description: "Manfaat perkembangan bagi bayi (jelaskan aspek neurosains/motorik)" },
-      safetyTip: { type: Type.STRING, description: "Tips keamanan spesifik untuk aktivitas ini" }
-    },
-    required: ["title", "duration", "materials", "instructions", "benefits", "safetyTip"]
+  type: Type.OBJECT,
+  properties: {
+    activities: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          title: { type: Type.STRING, description: "Judul aktivitas" },
+          duration: { type: Type.STRING, description: "Durasi (cth: 5-10 menit)" },
+          materials: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING },
+            description: "Alat/bahan"
+          },
+          instructions: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING },
+            description: "Langkah-langkah"
+          },
+          benefits: { type: Type.STRING, description: "Manfaat tumbuh kembang" },
+          safetyTip: { type: Type.STRING, description: "Tips keamanan" }
+        },
+        required: ["title", "duration", "materials", "instructions", "benefits", "safetyTip"]
+      }
+    }
   }
 };
 
@@ -42,61 +48,86 @@ export const generateActivities = async (
 ): Promise<Activity[]> => {
   
   const ageContext = exactAgeDisplay ? `tepatnya ${exactAgeDisplay}` : `${ageMonths} bulan`;
-  const prompt = `Bertindaklah sebagai ahli perkembangan anak pribadi untuk bayi bernama Keinara.
-      Saat ini usianya ${ageContext}.
-      Berikan 3 rekomendasi aktivitas stimulasi untuk *hari ini* dengan fokus pada ${focusArea}.
+  const prompt = `Bertindaklah sebagai ahli perkembangan anak.
+      Subjek: Bayi usia ${ageContext}.
+      Tugas: Buat 3 rekomendasi aktivitas stimulasi untuk *hari ini* dengan fokus: ${focusArea}.
       
-      Panduan:
-      1. Aktivitas harus menggunakan barang rumah tangga sederhana.
-      2. Jelaskan manfaatnya dari sudut pandang perkembangan saraf atau otot.
+      Syarat:
+      1. Gunakan barang rumah tangga sederhana.
+      2. Aman dan menyenangkan.
+      3. Bahasa Indonesia.
       
-      PENTING: Keluarkan HANYA JSON valid.`;
+      FORMAT OUTPUT: JSON Object dengan property "activities" yang berisi array aktivitas.`;
+
+  // Standard safety settings to prevent false positives on "baby physical activities"
+  const safetySettings = [
+    { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+    { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+    { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
+    { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH }
+  ];
 
   try {
-    // Attempt 1: Gemini 2.5 Flash with Schema (Most structured & fast)
+    // Attempt 1: Gemini 2.5 Flash with Object Schema
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: prompt,
       config: { 
         responseMimeType: "application/json", 
-        responseSchema: activitySchema 
+        responseSchema: activitySchema,
+        safetySettings: safetySettings
       }
     });
 
     if (response.text) {
-      // Robust Parsing: Extract only the JSON array part
-      const cleanText = response.text.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
-      const startIndex = cleanText.indexOf('[');
-      const endIndex = cleanText.lastIndexOf(']');
+      let jsonString = response.text.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
       
-      if (startIndex !== -1 && endIndex !== -1) {
-          const jsonString = cleanText.substring(startIndex, endIndex + 1);
-          return JSON.parse(jsonString) as Activity[];
+      // Try to find the JSON object if there's extra text
+      const firstBrace = jsonString.indexOf('{');
+      const lastBrace = jsonString.lastIndexOf('}');
+      if (firstBrace !== -1 && lastBrace !== -1) {
+        jsonString = jsonString.substring(firstBrace, lastBrace + 1);
       }
-      return JSON.parse(cleanText) as Activity[];
+
+      const parsed = JSON.parse(jsonString);
+      
+      // Handle wrapped object (Schema compliant)
+      if (parsed.activities && Array.isArray(parsed.activities)) {
+        return parsed.activities;
+      }
+      // Handle if model returned direct array (Non-compliant but possible)
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
     }
   } catch (error) {
-    console.warn("Attempt 1 (Schema) failed, retrying with loose JSON...", error);
+    console.warn("Attempt 1 (Schema) failed, retrying with simple prompt...", error);
     try {
-        // Attempt 2: Fallback without strict schema (More robust)
+        // Attempt 2: Fallback without strict schema, asking for raw JSON
         const response = await ai.models.generateContent({
             model: "gemini-2.5-flash",
-            contents: prompt + "\n\nFormat output sebagai JSON Array of objects dengan keys: title, duration, materials, instructions, benefits, safetyTip.",
+            contents: prompt + "\n\nKeluarkan HANYA raw JSON string valid. Jangan ada markdown ```.",
             config: { 
-                responseMimeType: "application/json"
+                responseMimeType: "application/json",
+                safetySettings: safetySettings
             }
         });
 
         if (response.text) {
-            const cleanText = response.text.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
-            const startIndex = cleanText.indexOf('[');
-            const endIndex = cleanText.lastIndexOf(']');
-            
-            if (startIndex !== -1 && endIndex !== -1) {
-                const jsonString = cleanText.substring(startIndex, endIndex + 1);
-                return JSON.parse(jsonString) as Activity[];
+            let jsonString = response.text.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+             const firstBrace = jsonString.indexOf('{');
+            const lastBrace = jsonString.lastIndexOf('}');
+            if (firstBrace !== -1 && lastBrace !== -1) {
+                jsonString = jsonString.substring(firstBrace, lastBrace + 1);
             }
-            return JSON.parse(cleanText) as Activity[];
+
+            const parsed = JSON.parse(jsonString);
+            if (parsed.activities && Array.isArray(parsed.activities)) {
+                return parsed.activities;
+            }
+            if (Array.isArray(parsed)) {
+                return parsed;
+            }
         }
     } catch (e2) {
         console.error("All generateActivity attempts failed", e2);
