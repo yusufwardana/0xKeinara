@@ -1,21 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { Activity, FocusArea } from '../types';
 import { generateActivities } from '../services/geminiService';
-import { Loader2, Sparkles, BookOpen, Clock, ShieldCheck, Bookmark, History, Trash2, ArrowLeft, Brain } from 'lucide-react';
+import { Sparkles, BookOpen, Clock, ShieldCheck, Bookmark, History, Trash2, ArrowLeft, Brain } from 'lucide-react';
 
 interface Props {
   babyAge: number;
+  exactAgeDisplay?: string; // e.g. "6 Bulan 12 Hari"
 }
 
 const LOADING_MESSAGES = [
-  "AI sedang menganalisis tahap perkembangan...",
-  "Merancang aktivitas yang aman dan edukatif...",
-  "Menyesuaikan dengan kemampuan motorik...",
-  "Memeriksa tips keamanan...",
+  "AI sedang menghitung usia presisi...",
+  "Menganalisis kebutuhan hari ini...",
+  "Merancang aktivitas yang aman...",
+  "Menyesuaikan dengan motorik halus...",
   "Menyusun instruksi permainan..."
 ];
 
-const ActivityGenerator: React.FC<Props> = ({ babyAge }) => {
+const ActivityGenerator: React.FC<Props> = ({ babyAge, exactAgeDisplay }) => {
   const [selectedFocus, setSelectedFocus] = useState<FocusArea>(FocusArea.MOTOR_KASAR);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(false);
@@ -57,7 +58,7 @@ const ActivityGenerator: React.FC<Props> = ({ babyAge }) => {
     setActivities([]);
     setShowHistory(false);
     try {
-      const results = await generateActivities(babyAge, selectedFocus);
+      const results = await generateActivities(babyAge, selectedFocus, exactAgeDisplay);
       if (results.length === 0) {
           setError("Maaf, gagal membuat rekomendasi. Coba lagi nanti.");
       }
@@ -199,7 +200,7 @@ const ActivityGenerator: React.FC<Props> = ({ babyAge }) => {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Fokus Perkembangan
+              Fokus Perkembangan <span className="text-gray-400 font-normal">(Usia: {exactAgeDisplay})</span>
             </label>
             <select
               value={selectedFocus}
@@ -225,7 +226,7 @@ const ActivityGenerator: React.FC<Props> = ({ babyAge }) => {
                 <span className="animate-pulse w-48 text-left">{LOADING_MESSAGES[loadingMsgIndex]}</span>
               </>
             ) : (
-              'Buat Rencana Main'
+              'Buat Rencana Main Hari Ini'
             )}
           </button>
         </div>

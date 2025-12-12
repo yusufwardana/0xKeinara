@@ -37,27 +37,32 @@ const activitySchema = {
 
 export const generateActivities = async (
   ageMonths: number,
-  focusArea: FocusArea
+  focusArea: FocusArea,
+  exactAgeDisplay: string = "" 
 ): Promise<Activity[]> => {
+  
+  const ageContext = exactAgeDisplay ? `tepatnya ${exactAgeDisplay}` : `${ageMonths} bulan`;
+
   // Strategy 1: Try Thinking Mode (Gemini 3 Pro)
   try {
     const config: any = {
       thinkingConfig: { thinkingBudget: 32768 },
-      maxOutputTokens: 65536, // Must be > thinkingBudget to leave room for response
+      maxOutputTokens: 65536, 
       responseMimeType: "application/json",
       responseSchema: activitySchema
     };
 
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
-      contents: `Bertindaklah sebagai ahli perkembangan anak dan terapis okupasi pediatrik.
-      Analisis tahap perkembangan bayi usia ${ageMonths} bulan secara mendalam menggunakan kemampuan "Thinking Mode".
-      Berikan 3 aktivitas stimulasi yang sangat spesifik, aman, dan edukatif dengan fokus pada ${focusArea}.
+      contents: `Bertindaklah sebagai ahli perkembangan anak pribadi untuk bayi bernama Keinara.
+      Saat ini usianya ${ageContext}.
+      Analisis tahap perkembangan bayi usia ini secara presisi (hari ke hari) menggunakan kemampuan "Thinking Mode".
+      Berikan 3 rekomendasi aktivitas stimulasi untuk *hari ini* dengan fokus pada ${focusArea}.
       
       Panduan:
       1. Aktivitas harus menggunakan barang rumah tangga sederhana.
-      2. Jelaskan manfaatnya dari sudut pandang perkembangan saraf atau otot (sederhana namun ilmiah).
-      3. Pastikan tingkat kesulitan tepat: menantang tapi bisa dicapai (zone of proximal development).
+      2. Jelaskan manfaatnya dari sudut pandang perkembangan saraf atau otot.
+      3. Sesuaikan dengan nuansa usia spesifik (misal: jika hampir ganti bulan, berikan tantangan transisi).
       
       Bahasa Indonesia.`,
       config: config
@@ -74,7 +79,7 @@ export const generateActivities = async (
   try {
     const fallbackResponse = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: `Buatkan 3 aktivitas stimulasi bayi usia ${ageMonths} bulan untuk melatih ${focusArea}. 
+      contents: `Buatkan 3 aktivitas stimulasi bayi usia ${ageContext} untuk melatih ${focusArea}. 
       Gunakan alat sederhana di rumah. Berikan judul, durasi, alat, instruksi, manfaat, dan tips keamanan. 
       Output JSON array. Bahasa Indonesia.`,
       config: {
