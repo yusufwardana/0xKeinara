@@ -44,15 +44,9 @@ export const generateActivities = async (
   const ageContext = exactAgeDisplay ? `tepatnya ${exactAgeDisplay}` : `${ageMonths} bulan`;
 
   try {
-    const config: any = {
-      thinkingConfig: { thinkingBudget: 1024 }, // Lower budget for faster response on activities
-      maxOutputTokens: 8192, 
-      responseMimeType: "application/json",
-      responseSchema: activitySchema
-    };
-
+    // Using standard flash model for reliability and speed in generating JSON
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-thinking", // Use flash-thinking for speed + logic balance
+      model: "gemini-2.5-flash",
       contents: `Bertindaklah sebagai ahli perkembangan anak pribadi untuk bayi bernama Keinara.
       Saat ini usianya ${ageContext}.
       Berikan 3 rekomendasi aktivitas stimulasi untuk *hari ini* dengan fokus pada ${focusArea}.
@@ -61,23 +55,18 @@ export const generateActivities = async (
       1. Aktivitas harus menggunakan barang rumah tangga sederhana.
       2. Jelaskan manfaatnya dari sudut pandang perkembangan saraf atau otot.
       
-      Bahasa Indonesia.`,
-      config: config
+      Bahasa Indonesia. Keluarkan output HANYA JSON array sesuai schema.`,
+      config: { 
+        responseMimeType: "application/json", 
+        responseSchema: activitySchema 
+      }
     });
 
     if (response.text) {
       return JSON.parse(response.text) as Activity[];
     }
   } catch (error) {
-    // Fallback logic standard
-    try {
-        const fallbackResponse = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: `Buatkan 3 aktivitas stimulasi bayi usia ${ageContext} untuk melatih ${focusArea}. Output JSON array. Bahasa Indonesia.`,
-            config: { responseMimeType: "application/json", responseSchema: activitySchema }
-        });
-        if (fallbackResponse.text) return JSON.parse(fallbackResponse.text);
-    } catch (e) { console.error(e); }
+    console.error("Generate Activity Error", error);
   }
   return [];
 };
@@ -94,7 +83,7 @@ export const getMilestoneAdvice = async (ageMonths: number): Promise<string> => 
   }
 }
 
-// --- NEW: Chat Assistant Logic ---
+// --- Chat Assistant Logic ---
 let chatSession: any = null;
 
 export const sendMessageToAssistant = async (
@@ -128,7 +117,7 @@ export const sendMessageToAssistant = async (
   }
 };
 
-// --- NEW: Growth Analysis Logic (Using Thinking Model) ---
+// --- NEW: Growth Analysis Logic (Using Gemini 3 Pro Thinking) ---
 export const analyzeGrowth = async (
   records: GrowthRecord[],
   babyName: string,
@@ -144,7 +133,7 @@ export const analyzeGrowth = async (
     .join('\n');
 
   try {
-    // Using gemini-3-pro-preview with Thinking Mode for complex health data analysis
+    // Using gemini-3-pro-preview with MAX Thinking Budget for deep health analysis
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
       contents: `Analisis data pertumbuhan bayi berikut ini secara mendalam.
@@ -158,21 +147,22 @@ export const analyzeGrowth = async (
       ${recordsStr}
       
       Tugas:
-      1. Bandingkan tren pertumbuhan ini dengan standar WHO (Weight-for-age dan Length-for-age) secara umum. Apakah grafiknya naik stabil, stagnan, atau turun?
+      1. Bandingkan tren pertumbuhan ini dengan standar kurva WHO (Weight-for-age dan Length-for-age) secara umum. Apakah grafiknya naik stabil, stagnan, atau turun?
       2. Berikan penilaian status gizi singkat (misal: Pertumbuhan baik, Perlu perhatian, dll) berdasarkan data terakhir.
       3. Berikan 3 saran nutrisi atau pola makan (jika sudah MPASI) dan stimulasi fisik yang relevan dengan kondisi pertumbuhan ini.
       
       Gunakan bahasa yang menenangkan, suportif, dan mudah dipahami orang tua. Jangan mendiagnosis medis secara definitif, tapi sarankan konsultasi ke dokter jika ada tanda bahaya (red flag).`,
       config: {
         thinkingConfig: {
-          thinkingBudget: 32768, // High budget for careful analysis of health data
+          thinkingBudget: 32768, // Max budget for gemini 3 pro
         }
+        // maxOutputTokens is intentionally NOT set to allow full thinking output
       }
     });
 
     return response.text || "Gagal menganalisis data.";
   } catch (error) {
     console.error("Growth Analysis Error", error);
-    return "Maaf, sistem sedang sibuk. Silakan coba analisis lagi nanti.";
+    return "Maaf, sistem sedang sibuk atau model thinking sedang limit. Silakan coba lagi nanti.";
   }
 };

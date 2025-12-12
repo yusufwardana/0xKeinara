@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { GrowthRecord } from '../types';
 import { analyzeGrowth } from '../services/geminiService';
-import { Plus, Scale, Ruler, Calendar as CalendarIcon, TrendingUp, Activity } from 'lucide-react';
+import { Plus, Scale, Ruler, Calendar as CalendarIcon, TrendingUp, Activity, FileText } from 'lucide-react';
 
 interface Props {
   babyName: string;
@@ -77,7 +77,7 @@ const GrowthTracker: React.FC<Props> = ({ babyName, gender, birthDate }) => {
   const getLastRecord = () => records.length > 0 ? records[0] : null;
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in pb-20">
       
       {/* Summary Card */}
       <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
@@ -134,7 +134,7 @@ const GrowthTracker: React.FC<Props> = ({ babyName, gender, birthDate }) => {
               </>
             ) : (
               <>
-                <TrendingUp className="w-5 h-5" />
+                <FileText className="w-5 h-5" />
                 Analisis AI
               </>
             )}
@@ -201,13 +201,13 @@ const GrowthTracker: React.FC<Props> = ({ babyName, gender, birthDate }) => {
         <div className="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-purple-500">
             <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
                 <Activity className="w-5 h-5 text-purple-500" />
-                Hasil Analisis AI
+                Saran Progress AI
             </h3>
             <div className="prose prose-sm prose-indigo text-gray-600 leading-relaxed whitespace-pre-wrap">
                 {analysis}
             </div>
             <p className="text-xs text-gray-400 mt-4 italic">
-                *Analisis ini dibuat oleh AI berdasarkan data yang Anda masukkan dan standar umum. Selalu konsultasikan dengan dokter anak untuk diagnosis medis yang akurat.
+                *Analisis menggunakan Gemini 3 Pro Thinking Mode untuk membandingkan dengan data umum. Bukan pengganti diagnosis medis.
             </p>
         </div>
       )}
