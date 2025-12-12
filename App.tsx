@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Baby, Activity as ActivityIcon, ListChecks, Eye, Settings, Calendar, User, MessageCircle, Scale } from 'lucide-react';
+import { Baby, Activity as ActivityIcon, ListChecks, Eye, Settings, Calendar, User, MessageCircle } from 'lucide-react';
 import ActivityGenerator from './components/ActivityGenerator';
 import VisualStimulator from './components/VisualStimulator';
 import MilestoneTracker from './components/MilestoneTracker';
-import GrowthTracker from './components/GrowthTracker';
 import ChatAssistant from './components/ChatAssistant';
 import { calculateAge, AgeDetail } from './utils/ageCalculator';
 import { Gender } from './types';
 
-type View = 'activities' | 'visual' | 'milestones' | 'growth';
+type View = 'activities' | 'visual' | 'milestones';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('activities');
@@ -190,20 +189,6 @@ const App: React.FC = () => {
               <MilestoneTracker babyAge={ageDetail.months || 3} />
             </div>
           )}
-
-          {currentView === 'growth' && (
-             <div>
-               <div className="mb-6">
-                  <h2 className="text-2xl font-bold text-gray-800">Pelacak Pertumbuhan</h2>
-                  <p className="text-gray-500">Catat dan analisis berat serta tinggi badan {babyName}.</p>
-              </div>
-              <GrowthTracker 
-                babyName={babyName}
-                gender={gender}
-                birthDate={birthDate}
-              />
-            </div>
-          )}
         </div>
       </main>
 
@@ -232,7 +217,7 @@ const App: React.FC = () => {
         <div className="flex justify-between items-center max-w-sm mx-auto gap-1">
           <button 
             onClick={() => setCurrentView('activities')}
-            className={`flex flex-col items-center gap-1 w-16 ${currentView === 'activities' ? 'text-blue-600' : 'text-gray-400'}`}
+            className={`flex flex-col items-center gap-1 w-20 ${currentView === 'activities' ? 'text-blue-600' : 'text-gray-400'}`}
           >
             <ActivityIcon className="w-5 h-5" />
             <span className="text-[10px] font-medium">Main</span>
@@ -240,7 +225,7 @@ const App: React.FC = () => {
           
           <button 
             onClick={() => setCurrentView('visual')}
-            className={`flex flex-col items-center gap-1 w-16 ${currentView === 'visual' ? 'text-orange-600' : 'text-gray-400'}`}
+            className={`flex flex-col items-center gap-1 w-20 ${currentView === 'visual' ? 'text-orange-600' : 'text-gray-400'}`}
           >
             <Eye className="w-5 h-5" />
             <span className="text-[10px] font-medium">Visual</span>
@@ -248,18 +233,10 @@ const App: React.FC = () => {
 
           <button 
             onClick={() => setCurrentView('milestones')}
-            className={`flex flex-col items-center gap-1 w-16 ${currentView === 'milestones' ? 'text-green-600' : 'text-gray-400'}`}
+            className={`flex flex-col items-center gap-1 w-20 ${currentView === 'milestones' ? 'text-green-600' : 'text-gray-400'}`}
           >
             <ListChecks className="w-5 h-5" />
             <span className="text-[10px] font-medium">Milestone</span>
-          </button>
-
-          <button 
-            onClick={() => setCurrentView('growth')}
-            className={`flex flex-col items-center gap-1 w-16 ${currentView === 'growth' ? 'text-purple-600' : 'text-gray-400'}`}
-          >
-            <Scale className="w-5 h-5" />
-            <span className="text-[10px] font-medium">Tumbuh</span>
           </button>
         </div>
       </nav>
@@ -283,12 +260,6 @@ const App: React.FC = () => {
             className={`px-6 py-2 rounded-full font-medium transition-colors ${currentView === 'milestones' ? 'bg-green-100 text-green-700' : 'text-gray-600 hover:bg-gray-50'}`}
           >
             Milestone
-          </button>
-          <button 
-            onClick={() => setCurrentView('growth')}
-            className={`px-6 py-2 rounded-full font-medium transition-colors ${currentView === 'growth' ? 'bg-purple-100 text-purple-700' : 'text-gray-600 hover:bg-gray-50'}`}
-          >
-            Tumbuh
           </button>
       </div>
     </div>

@@ -1,3 +1,4 @@
+
 export enum FocusArea {
   MOTOR_KASAR = 'Motorik Kasar',
   MOTOR_HALUS = 'Motorik Halus',
@@ -36,12 +37,11 @@ export interface ChatMessage {
   timestamp: Date;
 }
 
+export type Gender = 'Laki-laki' | 'Perempuan';
+
 export interface GrowthRecord {
   id: string;
   date: string;
-  weight: number; // in kg
-  height: number; // in cm
-  notes?: string;
+  weight: number;
+  height: number;
 }
-
-export type Gender = 'Laki-laki' | 'Perempuan';

@@ -190,37 +190,34 @@ export const analyzeGrowth = async (
   gender: string,
   birthDate: string
 ): Promise<string> => {
-  if (records.length === 0) return "Belum ada data pertumbuhan untuk dianalisis.";
+  if (!records || records.length === 0) return "Belum ada data pertumbuhan untuk dianalisis.";
 
-  const recordsStr = records
+  // Sort chronological for context
+  const history = [...records]
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-    .map(r => `- Tanggal: ${r.date}, Berat: ${r.weight}kg, Tinggi: ${r.height}cm`)
+    .map(r => `- Tanggal ${r.date}: Berat ${r.weight}kg, Tinggi ${r.height}cm`)
     .join('\n');
 
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: `Analisis data pertumbuhan bayi berikut ini.
-      
-      Profil:
-      - Nama: ${babyName}
-      - Jenis Kelamin: ${gender}
-      - Tanggal Lahir: ${birthDate}
-      
-      Data Pertumbuhan:
-      ${recordsStr}
-      
-      Tugas:
-      1. Bandingkan tren pertumbuhan ini dengan standar kurva WHO (Weight-for-age dan Length-for-age) secara umum. Apakah grafiknya naik stabil, stagnan, atau turun?
-      2. Berikan penilaian status gizi singkat (misal: Pertumbuhan baik, Perlu perhatian, dll) berdasarkan data terakhir.
-      3. Berikan 3 saran nutrisi atau pola makan (jika sudah MPASI) dan stimulasi fisik yang relevan dengan kondisi pertumbuhan ini.
-      
-      Gunakan bahasa yang menenangkan, suportif, dan mudah dipahami orang tua. Jangan mendiagnosis medis secara definitif, tapi sarankan konsultasi ke dokter jika ada tanda bahaya (red flag).`,
+      contents: `
+        Anda adalah konsultan tumbuh kembang anak profesional namun ramah.
+        Subjek: Bayi bernama ${babyName}, Jenis Kelamin: ${gender}, Tanggal Lahir: ${birthDate}.
+        
+        Data Riwayat Pertumbuhan:
+        ${history}
+        
+        Tugas:
+        1. Analisis tren pertumbuhan secara singkat (apakah naik stabil, turun, atau ada lonjakan).
+        2. Berikan komentar penyemangat atau saran jika ada yang perlu diperhatikan (tetap sarankan konsultasi dokter untuk diagnosa medis).
+        3. Sertakan 1 tips nutrisi atau aktivitas fisik singkat yang relevan dengan data terakhir.
+        4. Gunakan Bahasa Indonesia yang hangat. Maksimal 150 kata.
+      `,
     });
-
-    return response.text || "Gagal menganalisis data.";
+    return response.text || "Tidak dapat memuat analisis saat ini.";
   } catch (error) {
     console.error("Growth Analysis Error", error);
-    return "Maaf, sistem sedang sibuk. Silakan coba lagi nanti.";
+    return "Maaf, terjadi kesalahan saat menghubungi layanan AI untuk analisis.";
   }
 };
