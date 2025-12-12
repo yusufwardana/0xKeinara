@@ -10,7 +10,7 @@ declare const process: {
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-// --- Existing Generator Logic ---
+// --- Activity Generator Logic ---
 const activitySchema = {
   type: Type.ARRAY,
   items: {
@@ -42,12 +42,7 @@ export const generateActivities = async (
 ): Promise<Activity[]> => {
   
   const ageContext = exactAgeDisplay ? `tepatnya ${exactAgeDisplay}` : `${ageMonths} bulan`;
-
-  try {
-    // Using standard flash model for reliability and speed in generating JSON
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: `Bertindaklah sebagai ahli perkembangan anak pribadi untuk bayi bernama Keinara.
+  const prompt = `Bertindaklah sebagai ahli perkembangan anak pribadi untuk bayi bernama Keinara.
       Saat ini usianya ${ageContext}.
       Berikan 3 rekomendasi aktivitas stimulasi untuk *hari ini* dengan fokus pada ${focusArea}.
       
@@ -55,7 +50,13 @@ export const generateActivities = async (
       1. Aktivitas harus menggunakan barang rumah tangga sederhana.
       2. Jelaskan manfaatnya dari sudut pandang perkembangan saraf atau otot.
       
-      Bahasa Indonesia. Keluarkan output HANYA JSON array sesuai schema.`,
+      Bahasa Indonesia. Keluarkan output JSON array.`;
+
+  try {
+    // Attempt 1: Gemini 2.5 Flash with Schema (Most structured)
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
       config: { 
         responseMimeType: "application/json", 
         responseSchema: activitySchema 
@@ -66,7 +67,23 @@ export const generateActivities = async (
       return JSON.parse(response.text) as Activity[];
     }
   } catch (error) {
-    console.error("Generate Activity Error", error);
+    console.warn("Attempt 1 (Schema) failed, retrying with loose JSON...", error);
+    try {
+        // Attempt 2: Fallback without strict schema (More robust against validation errors)
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt + "\n\nFormat output sebagai JSON Array of objects dengan keys: title, duration, materials, instructions, benefits, safetyTip.",
+            config: { 
+                responseMimeType: "application/json"
+            }
+        });
+
+        if (response.text) {
+            return JSON.parse(response.text) as Activity[];
+        }
+    } catch (e2) {
+        console.error("All generateActivity attempts failed", e2);
+    }
   }
   return [];
 };
@@ -83,7 +100,7 @@ export const getMilestoneAdvice = async (ageMonths: number): Promise<string> => 
   }
 }
 
-// --- Chat Assistant Logic ---
+// --- Chat Assistant Logic (Enhanced with Thinking Mode) ---
 let chatSession: any = null;
 
 export const sendMessageToAssistant = async (
@@ -94,17 +111,21 @@ export const sendMessageToAssistant = async (
   try {
     if (!chatSession) {
       chatSession = ai.chats.create({
-        model: "gemini-2.5-flash",
+        model: "gemini-3-pro-preview", // Upgraded to Thinking Model for complex parenting advice
         config: {
+          thinkingConfig: {
+             thinkingBudget: 32768, // Max thinking budget for deep reasoning
+          },
           systemInstruction: `Anda adalah Dokter Anak AI yang ramah dan empatik bernama "Keinara Bot". 
           Anda sedang berbicara dengan orang tua dari bayi bernama ${babyName}, yang saat ini berusia ${ageDisplay}.
           
           Tugas Anda:
           1. Menjawab pertanyaan seputar tumbuh kembang, kesehatan ringan, nutrisi, dan pola tidur.
-          2. Selalu gunakan nada bicara yang menenangkan dan suportif.
-          3. Jika pertanyaan bersifat medis darurat (demam tinggi, sesak napas, cedera), Anda WAJIB menyarankan untuk segera ke dokter asli.
-          4. Jawaban harus ringkas namun informatif (maksimal 3 paragraf).
-          5. Gunakan Bahasa Indonesia yang baik dan gaul sedikit agar akrab (bunda/ayah).`,
+          2. Gunakan "Thinking Mode" anda untuk menganalisis konteks pertanyaan sebelum menjawab, terutama untuk masalah perilaku atau gejala kesehatan.
+          3. Selalu gunakan nada bicara yang menenangkan dan suportif.
+          4. Jika pertanyaan bersifat medis darurat (demam tinggi, sesak napas, cedera), Anda WAJIB menyarankan untuk segera ke dokter asli.
+          5. Jawaban harus ringkas namun informatif (maksimal 3 paragraf).
+          6. Gunakan Bahasa Indonesia yang baik dan gaul sedikit agar akrab (bunda/ayah).`,
         },
       });
     }
@@ -113,11 +134,13 @@ export const sendMessageToAssistant = async (
     return result.text;
   } catch (error) {
     console.error("Chat Error", error);
-    return "Maaf Bunda, koneksi saya sedang gangguan. Bisa diulang lagi?";
+    // Reset session on error to clear potentially stuck state
+    chatSession = null;
+    return "Maaf Bunda, saya sedang berpikir terlalu keras dan koneksi terputus. Boleh diulang pertanyaannya?";
   }
 };
 
-// --- NEW: Growth Analysis Logic (Using Gemini 3 Pro Thinking) ---
+// --- Growth Analysis Logic (Using Gemini 3 Pro Thinking) ---
 export const analyzeGrowth = async (
   records: GrowthRecord[],
   babyName: string,
@@ -156,7 +179,7 @@ export const analyzeGrowth = async (
         thinkingConfig: {
           thinkingBudget: 32768, // Max budget for gemini 3 pro
         }
-        // maxOutputTokens is intentionally NOT set to allow full thinking output
+        // Do not set maxOutputTokens to allow full thinking output
       }
     });
 
