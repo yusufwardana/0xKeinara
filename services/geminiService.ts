@@ -53,7 +53,7 @@ export const generateActivities = async (
       Bahasa Indonesia. Keluarkan output JSON array.`;
 
   try {
-    // Attempt 1: Gemini 2.5 Flash with Schema (Most structured)
+    // Attempt 1: Gemini 2.5 Flash with Schema (Most structured & fast)
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: prompt,
@@ -64,12 +64,14 @@ export const generateActivities = async (
     });
 
     if (response.text) {
-      return JSON.parse(response.text) as Activity[];
+      // FIX: Clean potential markdown code blocks before parsing
+      const cleanText = response.text.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+      return JSON.parse(cleanText) as Activity[];
     }
   } catch (error) {
     console.warn("Attempt 1 (Schema) failed, retrying with loose JSON...", error);
     try {
-        // Attempt 2: Fallback without strict schema (More robust against validation errors)
+        // Attempt 2: Fallback without strict schema (More robust)
         const response = await ai.models.generateContent({
             model: "gemini-2.5-flash",
             contents: prompt + "\n\nFormat output sebagai JSON Array of objects dengan keys: title, duration, materials, instructions, benefits, safetyTip.",
@@ -79,7 +81,9 @@ export const generateActivities = async (
         });
 
         if (response.text) {
-            return JSON.parse(response.text) as Activity[];
+            // FIX: Clean potential markdown code blocks before parsing
+            const cleanText = response.text.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+            return JSON.parse(cleanText) as Activity[];
         }
     } catch (e2) {
         console.error("All generateActivity attempts failed", e2);
@@ -100,7 +104,7 @@ export const getMilestoneAdvice = async (ageMonths: number): Promise<string> => 
   }
 }
 
-// --- Chat Assistant Logic ---
+// --- Chat Assistant Logic (Thinking Mode Enabled) ---
 let chatSession: any = null;
 
 export const sendMessageToAssistant = async (
@@ -111,17 +115,21 @@ export const sendMessageToAssistant = async (
   try {
     if (!chatSession) {
       chatSession = ai.chats.create({
-        model: "gemini-2.5-flash",
+        model: "gemini-3-pro-preview", // Use Thinking Model for complex reasoning
         config: {
+          thinkingConfig: {
+             thinkingBudget: 32768, // Max budget for deep thought
+          },
           systemInstruction: `Anda adalah Dokter Anak AI yang ramah dan empatik bernama "Keinara Bot". 
           Anda sedang berbicara dengan orang tua dari bayi bernama ${babyName}, yang saat ini berusia ${ageDisplay}.
           
           Tugas Anda:
           1. Menjawab pertanyaan seputar tumbuh kembang, kesehatan ringan, nutrisi, dan pola tidur.
-          2. Selalu gunakan nada bicara yang menenangkan dan suportif.
-          3. Jika pertanyaan bersifat medis darurat (demam tinggi, sesak napas, cedera), Anda WAJIB menyarankan untuk segera ke dokter asli.
-          4. Jawaban harus ringkas namun informatif (maksimal 3 paragraf).
-          5. Gunakan Bahasa Indonesia yang baik dan gaul sedikit agar akrab (bunda/ayah).`,
+          2. Gunakan kemampuan berpikir mendalam (Thinking Mode) untuk menganalisis nuansa pertanyaan orang tua sebelum menjawab.
+          3. Selalu gunakan nada bicara yang menenangkan dan suportif.
+          4. Jika pertanyaan bersifat medis darurat (demam tinggi, sesak napas, cedera), Anda WAJIB menyarankan untuk segera ke dokter asli.
+          5. Jawaban harus ringkas namun informatif (maksimal 3 paragraf).
+          6. Gunakan Bahasa Indonesia yang baik dan gaul sedikit agar akrab (bunda/ayah).`,
         },
       });
     }
@@ -130,13 +138,12 @@ export const sendMessageToAssistant = async (
     return result.text;
   } catch (error) {
     console.error("Chat Error", error);
-    // Reset session on error to clear potentially stuck state
     chatSession = null;
-    return "Maaf Bunda, saya sedang mengalami gangguan koneksi. Boleh diulang pertanyaannya?";
+    return "Maaf Bunda, koneksi saya sedang gangguan atau saya berpikir terlalu lama. Boleh diulang pertanyaannya?";
   }
 };
 
-// --- Growth Analysis Logic ---
+// --- Growth Analysis Logic (Thinking Mode Enabled) ---
 export const analyzeGrowth = async (
   records: GrowthRecord[],
   babyName: string,
@@ -145,7 +152,6 @@ export const analyzeGrowth = async (
 ): Promise<string> => {
   if (records.length === 0) return "Belum ada data pertumbuhan untuk dianalisis.";
 
-  // Format records for the prompt
   const recordsStr = records
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     .map(r => `- Tanggal: ${r.date}, Berat: ${r.weight}kg, Tinggi: ${r.height}cm`)
@@ -153,8 +159,8 @@ export const analyzeGrowth = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: `Analisis data pertumbuhan bayi berikut ini.
+      model: "gemini-3-pro-preview", // Use Thinking Model for detailed analysis
+      contents: `Analisis data pertumbuhan bayi berikut ini secara mendalam.
       
       Profil:
       - Nama: ${babyName}
@@ -170,11 +176,16 @@ export const analyzeGrowth = async (
       3. Berikan 3 saran nutrisi atau pola makan (jika sudah MPASI) dan stimulasi fisik yang relevan dengan kondisi pertumbuhan ini.
       
       Gunakan bahasa yang menenangkan, suportif, dan mudah dipahami orang tua. Jangan mendiagnosis medis secara definitif, tapi sarankan konsultasi ke dokter jika ada tanda bahaya (red flag).`,
+      config: {
+        thinkingConfig: {
+          thinkingBudget: 32768, // Max budget for deep thought
+        }
+      }
     });
 
     return response.text || "Gagal menganalisis data.";
   } catch (error) {
     console.error("Growth Analysis Error", error);
-    return "Maaf, sistem sedang sibuk. Silakan coba lagi nanti.";
+    return "Maaf, sistem sedang sibuk atau limit tercapai. Silakan coba lagi nanti.";
   }
 };
