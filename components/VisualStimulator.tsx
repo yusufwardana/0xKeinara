@@ -13,7 +13,7 @@ const VisualStimulator: React.FC = () => {
   const modes: VisualMode[] = [
     { name: 'Hitam Putih', type: 'high-contrast', description: 'Untuk 0-3 bulan. Pola kontras tinggi untuk fokus.' },
     { name: 'Objek Bergerak', type: 'tracking', description: 'Melatih otot mata mengikuti objek.' },
-    { name: 'Warna-Warni', type: 'colors', description: 'Untuk 6+ bulan. Stimulasi spektrum warna.' },
+    { name: 'Warna-Warni', type: 'colors', description: 'Untuk 6+ bulan. Stimulasi spektrum warna & bentuk.' },
   ];
 
   const toggleFullscreen = () => {
@@ -64,7 +64,6 @@ const VisualStimulator: React.FC = () => {
     let ballY = canvas.height / 2;
     let dx = 3;
     let dy = 3;
-    let angle = 0;
 
     const render = () => {
       frame++;
@@ -172,49 +171,80 @@ const VisualStimulator: React.FC = () => {
         }
 
       } else if (activeMode === 'colors') {
-        const colorType = Math.floor(frame / 300) % 2;
+        // --- DYNAMIC GRADIENT & FLOATING SHAPES ---
+
+        // 1. Dynamic Gradient Background (HSL shift)
+        const gradient = ctx.createLinearGradient(0, 0, width, height);
+        // Slowly rotate hues
+        const h1 = (frame * 0.5) % 360;
+        const h2 = (h1 + 60) % 360;
+        const h3 = (h1 + 120) % 360;
         
-        if (colorType === 0) {
-             // GRADIENT & FLOATING
-            const time = frame * 0.01;
-            const r = Math.floor(128 + 128 * Math.sin(time));
-            const g = Math.floor(128 + 128 * Math.sin(time + 2));
-            const b = Math.floor(128 + 128 * Math.sin(time + 4));
+        gradient.addColorStop(0, `hsl(${h1}, 75%, 75%)`); 
+        gradient.addColorStop(0.5, `hsl(${h2}, 75%, 75%)`);
+        gradient.addColorStop(1, `hsl(${h3}, 75%, 75%)`);
+        
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, width, height);
+
+        // 2. Floating Shapes
+        const numShapes = 12;
+        
+        for (let i = 0; i < numShapes; i++) {
+            // Deterministic random properties derived from index i
+            const sizeBase = 25;
+            const sizeVar = (i * 19) % 60; 
+            const size = sizeBase + sizeVar; // Size varies 25px - 85px
             
-            ctx.fillStyle = `rgb(${r},${g},${b})`;
-            ctx.fillRect(0, 0, width, height);
+            const speedFactor = 1 + ((i * 3) % 4) * 0.4; // Varied speeds
             
-            // Floating shapes
-            for(let i=0; i<5; i++) {
-               ctx.fillStyle = 'rgba(255,255,255,0.3)';
-               const x = (width / 5) * i + 50 + Math.sin(frame * 0.02 + i) * 30;
-               const y = centerY + Math.cos(frame * 0.03 + i) * 50;
-               ctx.beginPath();
-               if (i % 2 === 0) {
-                 ctx.arc(x, y, 40, 0, Math.PI * 2);
-               } else {
-                 ctx.rect(x-30, y-30, 60, 60);
-               }
-               ctx.fill();
+            // X Movement: Steady flow rightward with wrap-around
+            const xOffset = i * (width / numShapes);
+            let x = (xOffset + frame * speedFactor) % (width + size * 2);
+            x -= size; 
+            
+            // Y Movement: Sine wave floating
+            const yOffset = height * 0.5;
+            const amp = height * 0.35;
+            const freq = 0.01 + ((i % 5) * 0.005);
+            const phase = i * 1.5;
+            const y = yOffset + Math.sin(frame * freq + phase) * amp;
+            
+            // Rotation
+            const rotSpeed = 0.015 * ((i % 2 === 0) ? 1 : -1);
+            const rotation = frame * rotSpeed;
+
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(rotation);
+            
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+            
+            ctx.beginPath();
+            const shapeType = i % 3;
+            
+            if (shapeType === 0) {
+                // Circle
+                ctx.arc(0, 0, size / 2, 0, Math.PI * 2);
+            } else if (shapeType === 1) {
+                // Square
+                ctx.rect(-size / 2, -size / 2, size, size);
+            } else {
+                // Triangle
+                ctx.moveTo(0, -size / 2);
+                ctx.lineTo(size / 2, size / 2);
+                ctx.lineTo(-size / 2, size / 2);
+                ctx.closePath();
             }
-        } else {
-            // EXPANDING RINGS
-            ctx.fillStyle = '#111827'; // Dark bg
-            ctx.fillRect(0, 0, width, height);
             
-            const count = 10;
-            const maxR = Math.max(width, height);
+            ctx.fill();
             
-            for(let i=0; i<count; i++) {
-                const progress = (frame * 2 + i * (maxR/count)) % maxR;
-                const hue = (frame + i * 30) % 360;
-                
-                ctx.beginPath();
-                ctx.arc(centerX, centerY, progress, 0, Math.PI * 2);
-                ctx.strokeStyle = `hsl(${hue}, 70%, 50%)`;
-                ctx.lineWidth = 15;
-                ctx.stroke();
-            }
+            // Add subtle stroke
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            ctx.restore();
         }
       }
 
@@ -243,8 +273,8 @@ const VisualStimulator: React.FC = () => {
 
   return (
     <div className="flex flex-col h-full space-y-4">
-      <div className="bg-white p-4 rounded-2xl shadow-sm border border-orange-100">
-        <h2 className="text-xl font-semibold text-orange-600 mb-4 text-center">Visual Stimulation</h2>
+      <div className="bg-white p-4 rounded-2xl shadow-sm border border-blue-100">
+        <h2 className="text-xl font-semibold text-blue-800 mb-4 text-center">Visual Stimulation</h2>
         
         <div className="flex justify-center gap-2 mb-6 flex-wrap">
           {modes.map((mode) => (
@@ -256,8 +286,8 @@ const VisualStimulator: React.FC = () => {
               }}
               className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
                 activeMode === mode.type
-                  ? 'bg-orange-500 text-white'
-                  : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
               }`}
             >
               {mode.name}
@@ -284,7 +314,7 @@ const VisualStimulator: React.FC = () => {
                <div className="absolute inset-0 flex flex-col gap-3 items-center justify-center bg-black/10 backdrop-blur-[2px] z-10">
                    <button 
                     onClick={() => setIsRunning(true)}
-                    className="bg-orange-600 text-white px-8 py-3 rounded-full font-bold shadow-lg hover:bg-orange-700 transform hover:scale-105 transition-all flex items-center gap-2"
+                    className="bg-blue-600 text-white px-8 py-3 rounded-full font-bold shadow-lg hover:bg-blue-700 transform hover:scale-105 transition-all flex items-center gap-2"
                    >
                        Mulai Play
                    </button>

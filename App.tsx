@@ -47,8 +47,8 @@ const App: React.FC = () => {
         <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-white rounded-2xl shadow-xl p-8 max-w-sm w-full">
             <div className="text-center mb-6">
-              <div className="bg-orange-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Baby className="w-8 h-8 text-orange-500" />
+              <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Baby className="w-8 h-8 text-blue-600" />
               </div>
               <h2 className="text-2xl font-bold text-gray-800">Profil Si Kecil</h2>
               <p className="text-gray-500 text-sm">Kami butuh data ini untuk menghitung usia presisi.</p>
@@ -64,7 +64,7 @@ const App: React.FC = () => {
                     required
                     value={babyName}
                     onChange={(e) => setBabyName(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-orange-400 outline-none"
+                    className="w-full pl-9 pr-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-400 outline-none"
                     placeholder="Contoh: Keinara"
                   />
                 </div>
@@ -79,14 +79,14 @@ const App: React.FC = () => {
                     required
                     value={birthDate}
                     onChange={(e) => setBirthDate(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-orange-400 outline-none"
+                    className="w-full pl-9 pr-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-400 outline-none"
                   />
                 </div>
               </div>
 
               <button 
                 type="submit"
-                className="w-full bg-gradient-to-r from-orange-500 to-pink-500 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
+                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
               >
                 Simpan Profil
               </button>
@@ -110,10 +110,10 @@ const App: React.FC = () => {
       <header className="bg-white sticky top-0 z-50 border-b border-gray-100 shadow-sm">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="bg-orange-100 p-2 rounded-xl">
-              <Baby className="w-6 h-6 text-orange-500" />
+            <div className="bg-blue-100 p-2 rounded-xl">
+              <Baby className="w-6 h-6 text-blue-600" />
             </div>
-            <h1 className="text-xl font-bold bg-gradient-to-r from-orange-500 to-pink-500 bg-clip-text text-transparent hidden sm:block">
+            <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent hidden sm:block">
               Keinara
             </h1>
           </div>
