@@ -10,38 +10,42 @@ declare const process: {
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
+// Schema definition used for both strategies
+const activitySchema = {
+  type: Type.ARRAY,
+  items: {
+    type: Type.OBJECT,
+    properties: {
+      title: { type: Type.STRING, description: "Judul aktivitas yang menarik" },
+      duration: { type: Type.STRING, description: "Perkiraan durasi (misal: 5-10 menit)" },
+      materials: {
+        type: Type.ARRAY,
+        items: { type: Type.STRING },
+        description: "Daftar alat/bahan yang dibutuhkan"
+      },
+      instructions: {
+        type: Type.ARRAY,
+        items: { type: Type.STRING },
+        description: "Langkah-langkah melakukan aktivitas"
+      },
+      benefits: { type: Type.STRING, description: "Manfaat perkembangan bagi bayi (jelaskan aspek neurosains/motorik)" },
+      safetyTip: { type: Type.STRING, description: "Tips keamanan spesifik untuk aktivitas ini" }
+    },
+    required: ["title", "duration", "materials", "instructions", "benefits", "safetyTip"]
+  }
+};
+
 export const generateActivities = async (
   ageMonths: number,
   focusArea: FocusArea
 ): Promise<Activity[]> => {
+  // Strategy 1: Try Thinking Mode (Gemini 3 Pro)
   try {
-    // Cast config to any to avoid TypeScript errors if the SDK types are missing thinkingConfig
     const config: any = {
       thinkingConfig: { thinkingBudget: 32768 },
+      maxOutputTokens: 65536, // Must be > thinkingBudget to leave room for response
       responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            title: { type: Type.STRING, description: "Judul aktivitas yang menarik" },
-            duration: { type: Type.STRING, description: "Perkiraan durasi (misal: 5-10 menit)" },
-            materials: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING },
-              description: "Daftar alat/bahan yang dibutuhkan"
-            },
-            instructions: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING },
-              description: "Langkah-langkah melakukan aktivitas"
-            },
-            benefits: { type: Type.STRING, description: "Manfaat perkembangan bagi bayi (jelaskan aspek neurosains/motorik)" },
-            safetyTip: { type: Type.STRING, description: "Tips keamanan spesifik untuk aktivitas ini" }
-          },
-          required: ["title", "duration", "materials", "instructions", "benefits", "safetyTip"]
-        }
-      }
+      responseSchema: activitySchema
     };
 
     const response = await ai.models.generateContent({
@@ -62,11 +66,31 @@ export const generateActivities = async (
     if (response.text) {
       return JSON.parse(response.text) as Activity[];
     }
-    return [];
   } catch (error) {
-    console.error("Error generating activities:", error);
-    return [];
+    console.warn("Thinking mode failed, falling back to standard model:", error);
   }
+
+  // Strategy 2: Fallback to Flash (Gemini 2.5) if Thinking fails/timeouts
+  try {
+    const fallbackResponse = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: `Buatkan 3 aktivitas stimulasi bayi usia ${ageMonths} bulan untuk melatih ${focusArea}. 
+      Gunakan alat sederhana di rumah. Berikan judul, durasi, alat, instruksi, manfaat, dan tips keamanan. 
+      Output JSON array. Bahasa Indonesia.`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: activitySchema
+      }
+    });
+
+    if (fallbackResponse.text) {
+      return JSON.parse(fallbackResponse.text) as Activity[];
+    }
+  } catch (fallbackError) {
+    console.error("Fallback generation failed:", fallbackError);
+  }
+
+  return [];
 };
 
 export const getMilestoneAdvice = async (ageMonths: number): Promise<string> => {
