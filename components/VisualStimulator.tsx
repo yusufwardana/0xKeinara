@@ -1,17 +1,46 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { VisualMode } from '../types';
+import { Maximize, Minimize } from 'lucide-react';
 
 const VisualStimulator: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [activeMode, setActiveMode] = useState<VisualMode['type']>('high-contrast');
   const [isRunning, setIsRunning] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const animationRef = useRef<number | null>(null);
 
   const modes: VisualMode[] = [
-    { name: 'Hitam Putih', type: 'high-contrast', description: 'Untuk bayi 0-3 bulan. Meningkatkan fokus.' },
-    { name: 'Objek Bergerak', type: 'tracking', description: 'Untuk melatih pelacakan mata.' },
-    { name: 'Warna-Warni', type: 'colors', description: 'Untuk bayi 6+ bulan. Pengenalan warna.' },
+    { name: 'Hitam Putih', type: 'high-contrast', description: 'Untuk 0-3 bulan. Pola kontras tinggi untuk fokus.' },
+    { name: 'Objek Bergerak', type: 'tracking', description: 'Melatih otot mata mengikuti objek.' },
+    { name: 'Warna-Warni', type: 'colors', description: 'Untuk 6+ bulan. Stimulasi spektrum warna.' },
   ];
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      containerRef.current?.requestFullscreen().catch(err => {
+        console.error(`Error attempting to enable fullscreen: ${err.message}`);
+      });
+    } else {
+      document.exitFullscreen();
+    }
+  };
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+      // Force resize on change
+      if (canvasRef.current) {
+         setTimeout(() => {
+             canvasRef.current!.width = canvasRef.current!.offsetWidth;
+             canvasRef.current!.height = canvasRef.current!.offsetHeight;
+         }, 100);
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
 
   useEffect(() => {
     if (!isRunning) {
@@ -24,90 +53,168 @@ const VisualStimulator: React.FC = () => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Ensure size matches display
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+
     let frame = 0;
     
     // Tracking variables
     let ballX = canvas.width / 2;
     let ballY = canvas.height / 2;
-    let dx = 2;
-    let dy = 2;
+    let dx = 3;
+    let dy = 3;
+    let angle = 0;
 
     const render = () => {
       frame++;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const width = canvas.width;
+      const height = canvas.height;
+      const centerX = width / 2;
+      const centerY = height / 2;
+
+      ctx.clearRect(0, 0, width, height);
 
       if (activeMode === 'high-contrast') {
-        // Alternating Patterns
-        const patternType = Math.floor(frame / 120) % 2; // Switch every 2 seconds approx
+        // Change pattern every 3-4 seconds (approx 200 frames)
+        const patternType = Math.floor(frame / 200) % 4; 
         
         ctx.fillStyle = 'white';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillRect(0, 0, width, height);
         ctx.fillStyle = 'black';
 
         if (patternType === 0) {
-          // Checkerboard
-          const size = 100;
-          for (let y = 0; y < canvas.height; y += size) {
-            for (let x = 0; x < canvas.width; x += size) {
+          // CHECKERBOARD
+          const size = Math.min(width, height) / 4;
+          for (let y = 0; y < height; y += size) {
+            for (let x = 0; x < width; x += size) {
               if (((x / size) + (y / size)) % 2 === 0) {
                 ctx.fillRect(x, y, size, size);
               }
             }
           }
-        } else {
-          // Bullseye expanding
-          const maxRadius = Math.min(canvas.width, canvas.height) / 2;
+        } else if (patternType === 1) {
+          // BULLSEYE (Pulsing)
+          const maxRadius = Math.min(width, height) / 1.5;
           const pulse = (Math.sin(frame * 0.05) + 1) / 2; 
           
           for (let r = maxRadius; r > 0; r -= 40) {
              ctx.beginPath();
-             ctx.arc(canvas.width/2, canvas.height/2, r * (0.8 + 0.2 * pulse), 0, Math.PI * 2);
+             ctx.arc(centerX, centerY, r * (0.9 + 0.1 * pulse), 0, Math.PI * 2);
              ctx.fillStyle = ((r / 40) % 2 === 0) ? 'black' : 'white';
              ctx.fill();
           }
+        } else if (patternType === 2) {
+          // SUNBURST (Rotating)
+          const numRays = 12;
+          const rotation = frame * 0.01;
+          
+          ctx.save();
+          ctx.translate(centerX, centerY);
+          ctx.rotate(rotation);
+          
+          for (let i = 0; i < numRays; i++) {
+             ctx.beginPath();
+             ctx.moveTo(0, 0);
+             ctx.arc(0, 0, Math.max(width, height), (i * 2 * Math.PI) / numRays, ((i + 0.5) * 2 * Math.PI) / numRays);
+             ctx.lineTo(0, 0);
+             ctx.fill();
+          }
+          ctx.restore();
+        } else {
+           // MOVING BARS
+           const barWidth = 60;
+           const offset = (frame * 2) % (barWidth * 2);
+           
+           for(let x = -barWidth * 2; x < width + barWidth; x += barWidth * 2) {
+               ctx.fillRect(x + offset, 0, barWidth, height);
+           }
         }
 
       } else if (activeMode === 'tracking') {
         ctx.fillStyle = '#f0f9ff'; // Light blue bg
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillRect(0, 0, width, height);
 
-        // Bouncing red ball
-        ctx.beginPath();
-        ctx.arc(ballX, ballY, 40, 0, Math.PI * 2);
-        ctx.fillStyle = '#ef4444'; // Red
-        ctx.fill();
-        ctx.strokeStyle = '#991b1b';
-        ctx.lineWidth = 4;
-        ctx.stroke();
+        const trackType = Math.floor(frame / 400) % 2;
 
-        if (ballX + 40 > canvas.width || ballX - 40 < 0) dx = -dx;
-        if (ballY + 40 > canvas.height || ballY - 40 < 0) dy = -dy;
+        if (trackType === 0) {
+            // BOUNCING BALL
+            ctx.beginPath();
+            ctx.arc(ballX, ballY, 40, 0, Math.PI * 2);
+            ctx.fillStyle = '#ef4444'; // Red
+            ctx.fill();
+            ctx.strokeStyle = '#991b1b';
+            ctx.lineWidth = 4;
+            ctx.stroke();
 
-        ballX += dx;
-        ballY += dy;
+            if (ballX + 40 > width || ballX - 40 < 0) dx = -dx;
+            if (ballY + 40 > height || ballY - 40 < 0) dy = -dy;
+
+            ballX += dx;
+            ballY += dy;
+        } else {
+            // SINE WAVE MOVEMENT
+            const waveX = (frame * 3) % (width + 100) - 50;
+            const waveY = centerY + Math.sin(frame * 0.05) * (height / 4);
+            
+            ctx.beginPath();
+            ctx.arc(waveX, waveY, 45, 0, Math.PI * 2);
+            ctx.fillStyle = '#16a34a'; // Green
+            ctx.fill();
+            ctx.strokeStyle = '#14532d';
+            ctx.lineWidth = 4;
+            ctx.stroke();
+            
+            // Add trail eyes
+            ctx.fillStyle = 'white';
+            ctx.beginPath(); ctx.arc(waveX - 15, waveY - 10, 8, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(waveX + 15, waveY - 10, 8, 0, Math.PI * 2); ctx.fill();
+        }
 
       } else if (activeMode === 'colors') {
-        // Slow color changing gradient
-        const time = frame * 0.01;
-        const r = Math.floor(128 + 128 * Math.sin(time));
-        const g = Math.floor(128 + 128 * Math.sin(time + 2));
-        const b = Math.floor(128 + 128 * Math.sin(time + 4));
+        const colorType = Math.floor(frame / 300) % 2;
         
-        ctx.fillStyle = `rgb(${r},${g},${b})`;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // Floating shapes
-        for(let i=0; i<5; i++) {
-           ctx.fillStyle = 'rgba(255,255,255,0.3)';
-           const x = (canvas.width / 5) * i + 50 + Math.sin(frame * 0.02 + i) * 30;
-           const y = canvas.height / 2 + Math.cos(frame * 0.03 + i) * 50;
-           ctx.beginPath();
-           if (i % 2 === 0) {
-             ctx.arc(x, y, 40, 0, Math.PI * 2);
-           } else {
-             ctx.rect(x-30, y-30, 60, 60);
-           }
-           ctx.fill();
+        if (colorType === 0) {
+             // GRADIENT & FLOATING
+            const time = frame * 0.01;
+            const r = Math.floor(128 + 128 * Math.sin(time));
+            const g = Math.floor(128 + 128 * Math.sin(time + 2));
+            const b = Math.floor(128 + 128 * Math.sin(time + 4));
+            
+            ctx.fillStyle = `rgb(${r},${g},${b})`;
+            ctx.fillRect(0, 0, width, height);
+            
+            // Floating shapes
+            for(let i=0; i<5; i++) {
+               ctx.fillStyle = 'rgba(255,255,255,0.3)';
+               const x = (width / 5) * i + 50 + Math.sin(frame * 0.02 + i) * 30;
+               const y = centerY + Math.cos(frame * 0.03 + i) * 50;
+               ctx.beginPath();
+               if (i % 2 === 0) {
+                 ctx.arc(x, y, 40, 0, Math.PI * 2);
+               } else {
+                 ctx.rect(x-30, y-30, 60, 60);
+               }
+               ctx.fill();
+            }
+        } else {
+            // EXPANDING RINGS
+            ctx.fillStyle = '#111827'; // Dark bg
+            ctx.fillRect(0, 0, width, height);
+            
+            const count = 10;
+            const maxR = Math.max(width, height);
+            
+            for(let i=0; i<count; i++) {
+                const progress = (frame * 2 + i * (maxR/count)) % maxR;
+                const hue = (frame + i * 30) % 360;
+                
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, progress, 0, Math.PI * 2);
+                ctx.strokeStyle = `hsl(${hue}, 70%, 50%)`;
+                ctx.lineWidth = 15;
+                ctx.stroke();
+            }
         }
       }
 
@@ -121,7 +228,7 @@ const VisualStimulator: React.FC = () => {
     };
   }, [isRunning, activeMode]);
 
-  // Handle canvas sizing
+  // Handle canvas sizing on resize
   useEffect(() => {
     const handleResize = () => {
         if(canvasRef.current) {
@@ -158,17 +265,35 @@ const VisualStimulator: React.FC = () => {
           ))}
         </div>
 
-        <div className="relative w-full aspect-square md:aspect-video bg-gray-100 rounded-xl overflow-hidden shadow-inner border-4 border-gray-800">
+        <div 
+            ref={containerRef}
+            className={`relative w-full aspect-square md:aspect-video bg-gray-100 rounded-xl overflow-hidden shadow-inner border-4 border-gray-800 group ${isFullscreen ? 'h-screen w-screen border-none rounded-none fixed top-0 left-0 z-[200]' : ''}`}
+        >
+           {/* Controls Overlay */}
+           <div className={`absolute top-4 right-4 z-20 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity ${!isRunning ? 'opacity-100' : ''}`}>
+               <button
+                 onClick={toggleFullscreen}
+                 className="bg-black/40 hover:bg-black/60 text-white p-2 rounded-lg backdrop-blur-sm"
+                 title={isFullscreen ? "Keluar Fullscreen" : "Fullscreen"}
+               >
+                   {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
+               </button>
+           </div>
+
            {!isRunning && (
-               <div className="absolute inset-0 flex items-center justify-center bg-black/5 z-10">
+               <div className="absolute inset-0 flex flex-col gap-3 items-center justify-center bg-black/10 backdrop-blur-[2px] z-10">
                    <button 
                     onClick={() => setIsRunning(true)}
-                    className="bg-orange-600 text-white px-8 py-3 rounded-full font-bold shadow-lg hover:bg-orange-700 transform hover:scale-105 transition-all"
+                    className="bg-orange-600 text-white px-8 py-3 rounded-full font-bold shadow-lg hover:bg-orange-700 transform hover:scale-105 transition-all flex items-center gap-2"
                    >
                        Mulai Play
                    </button>
+                   <p className="text-sm font-medium text-gray-700 bg-white/80 px-3 py-1 rounded-full">
+                       Tekan tombol di pojok kanan untuk Fullscreen
+                   </p>
                </div>
            )}
+           
            <canvas ref={canvasRef} className="w-full h-full block" />
         </div>
         

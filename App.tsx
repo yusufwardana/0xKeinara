@@ -114,7 +114,7 @@ const App: React.FC = () => {
               <Baby className="w-6 h-6 text-orange-500" />
             </div>
             <h1 className="text-xl font-bold bg-gradient-to-r from-orange-500 to-pink-500 bg-clip-text text-transparent hidden sm:block">
-              0xKeinara
+              Keinara
             </h1>
           </div>
           
