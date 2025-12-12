@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Baby, Activity as ActivityIcon, ListChecks, Eye, Settings, Calendar, User } from 'lucide-react';
+import { Baby, Activity as ActivityIcon, ListChecks, Eye, Settings, Calendar, User, MessageCircle } from 'lucide-react';
 import ActivityGenerator from './components/ActivityGenerator';
 import VisualStimulator from './components/VisualStimulator';
 import MilestoneTracker from './components/MilestoneTracker';
+import ChatAssistant from './components/ChatAssistant';
 import { calculateAge, AgeDetail } from './utils/ageCalculator';
 
 type View = 'activities' | 'visual' | 'milestones';
@@ -15,6 +16,9 @@ const App: React.FC = () => {
   const [birthDate, setBirthDate] = useState<string>('');
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [ageDetail, setAgeDetail] = useState<AgeDetail>({ months: 6, days: 0, totalDays: 180, display: '6 Bulan' });
+
+  // Chat State
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   // Load Profile from Local Storage
   useEffect(() => {
@@ -40,7 +44,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#fdfbf7] text-gray-800 pb-24 md:pb-0">
+    <div className="min-h-screen bg-[#fdfbf7] text-gray-800 pb-24 md:pb-0 relative">
       
       {/* Profile Modal */}
       {isEditingProfile && (
@@ -170,6 +174,26 @@ const App: React.FC = () => {
           )}
         </div>
       </main>
+
+      {/* AI Chat Assistant FAB (Floating Action Button) */}
+      {!isChatOpen && (
+        <button 
+          onClick={() => setIsChatOpen(true)}
+          className="fixed bottom-24 right-4 md:bottom-8 md:right-8 bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-full shadow-xl z-40 transition-transform hover:scale-110 flex items-center justify-center animate-bounce-gentle"
+          title="Tanya AI"
+        >
+          <MessageCircle className="w-6 h-6" />
+        </button>
+      )}
+
+      {/* Chat Interface */}
+      {isChatOpen && (
+        <ChatAssistant 
+          babyName={babyName}
+          ageDisplay={ageDetail.display}
+          onClose={() => setIsChatOpen(false)}
+        />
+      )}
 
       {/* Bottom Navigation (Mobile First) */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 py-3 md:hidden shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-40">

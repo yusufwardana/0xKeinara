@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { VisualMode } from '../types';
-import { Maximize, Minimize } from 'lucide-react';
+import { Maximize, Minimize, Volume2, VolumeX } from 'lucide-react';
 
 const VisualStimulator: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -8,13 +8,90 @@ const VisualStimulator: React.FC = () => {
   const [activeMode, setActiveMode] = useState<VisualMode['type']>('high-contrast');
   const [isRunning, setIsRunning] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(false);
+  
   const animationRef = useRef<number | null>(null);
+  
+  // Audio Refs
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const gainNodeRef = useRef<GainNode | null>(null);
+  const noiseNodeRef = useRef<AudioBufferSourceNode | null>(null);
 
   const modes: VisualMode[] = [
     { name: 'Hitam Putih', type: 'high-contrast', description: 'Untuk 0-3 bulan. Pola kontras tinggi untuk fokus.' },
     { name: 'Objek Bergerak', type: 'tracking', description: 'Melatih otot mata mengikuti objek.' },
     { name: 'Warna-Warni', type: 'colors', description: 'Untuk 6+ bulan. Stimulasi spektrum warna.' },
   ];
+
+  // --- Audio Logic (Brown Noise Generator) ---
+  const initAudio = () => {
+    if (!audioContextRef.current) {
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        audioContextRef.current = new AudioContextClass();
+    }
+  };
+
+  const toggleSound = () => {
+    initAudio();
+    if (!audioContextRef.current) return;
+
+    if (soundEnabled) {
+        // Stop sound
+        setSoundEnabled(false);
+        if (gainNodeRef.current) {
+            gainNodeRef.current.gain.exponentialRampToValueAtTime(0.001, audioContextRef.current.currentTime + 0.5);
+            setTimeout(() => {
+                if(noiseNodeRef.current) {
+                    noiseNodeRef.current.stop();
+                    noiseNodeRef.current = null;
+                }
+            }, 500);
+        }
+    } else {
+        // Start Sound (Brown Noise - soothing low frequency)
+        setSoundEnabled(true);
+        if (audioContextRef.current.state === 'suspended') {
+            audioContextRef.current.resume();
+        }
+
+        const bufferSize = audioContextRef.current.sampleRate * 2; // 2 seconds buffer
+        const buffer = audioContextRef.current.createBuffer(1, bufferSize, audioContextRef.current.sampleRate);
+        const data = buffer.getChannelData(0);
+
+        // Generate Noise
+        for (let i = 0; i < bufferSize; i++) {
+            const white = Math.random() * 2 - 1;
+            // Simple Brown Noise approximation integration
+            data[i] = (lastOut + (0.02 * white)) / 1.02;
+            lastOut = data[i];
+            data[i] *= 3.5; // Compensate for gain loss
+        }
+
+        noiseNodeRef.current = audioContextRef.current.createBufferSource();
+        noiseNodeRef.current.buffer = buffer;
+        noiseNodeRef.current.loop = true;
+
+        gainNodeRef.current = audioContextRef.current.createGain();
+        gainNodeRef.current.gain.value = 0.001; // Start silent
+        
+        noiseNodeRef.current.connect(gainNodeRef.current);
+        gainNodeRef.current.connect(audioContextRef.current.destination);
+        
+        noiseNodeRef.current.start();
+        gainNodeRef.current.gain.exponentialRampToValueAtTime(0.15, audioContextRef.current.currentTime + 1); // Fade in to 15% volume
+    }
+  };
+  
+  // Variables for noise generation
+  let lastOut = 0;
+
+  useEffect(() => {
+    // Cleanup audio on unmount
+    return () => {
+        if (noiseNodeRef.current) noiseNodeRef.current.stop();
+        if (audioContextRef.current) audioContextRef.current.close();
+    };
+  }, []);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -271,6 +348,15 @@ const VisualStimulator: React.FC = () => {
         >
            {/* Controls Overlay */}
            <div className={`absolute top-4 right-4 z-20 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity ${!isRunning ? 'opacity-100' : ''}`}>
+               {/* Sound Toggle */}
+               <button
+                 onClick={toggleSound}
+                 className={`p-2 rounded-lg backdrop-blur-sm transition-colors ${soundEnabled ? 'bg-orange-500 text-white' : 'bg-black/40 hover:bg-black/60 text-white'}`}
+                 title={soundEnabled ? "Matikan Suara (Brown Noise)" : "Nyalakan Suara (Brown Noise)"}
+               >
+                 {soundEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+               </button>
+
                <button
                  onClick={toggleFullscreen}
                  className="bg-black/40 hover:bg-black/60 text-white p-2 rounded-lg backdrop-blur-sm"
@@ -288,8 +374,8 @@ const VisualStimulator: React.FC = () => {
                    >
                        Mulai Play
                    </button>
-                   <p className="text-sm font-medium text-gray-700 bg-white/80 px-3 py-1 rounded-full">
-                       Tekan tombol di pojok kanan untuk Fullscreen
+                   <p className="text-sm font-medium text-gray-700 bg-white/80 px-3 py-1 rounded-full text-center">
+                       Tekan tombol di pojok kanan untuk Fullscreen & Audio
                    </p>
                </div>
            )}
