@@ -10,7 +10,7 @@ declare const process: {
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-// --- Existing Generator Logic ---
+// Schema definition used for both strategies
 const activitySchema = {
   type: Type.ARRAY,
   items: {
@@ -43,23 +43,26 @@ export const generateActivities = async (
   
   const ageContext = exactAgeDisplay ? `tepatnya ${exactAgeDisplay}` : `${ageMonths} bulan`;
 
+  // Strategy 1: Try Thinking Mode (Gemini 3 Pro)
   try {
     const config: any = {
-      thinkingConfig: { thinkingBudget: 1024 }, // Lower budget for faster response on activities
-      maxOutputTokens: 8192, 
+      thinkingConfig: { thinkingBudget: 32768 },
+      maxOutputTokens: 65536, 
       responseMimeType: "application/json",
       responseSchema: activitySchema
     };
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-thinking", // Use flash-thinking for speed + logic balance
+      model: "gemini-3-pro-preview",
       contents: `Bertindaklah sebagai ahli perkembangan anak pribadi untuk bayi bernama Keinara.
       Saat ini usianya ${ageContext}.
+      Analisis tahap perkembangan bayi usia ini secara presisi (hari ke hari) menggunakan kemampuan "Thinking Mode".
       Berikan 3 rekomendasi aktivitas stimulasi untuk *hari ini* dengan fokus pada ${focusArea}.
       
       Panduan:
       1. Aktivitas harus menggunakan barang rumah tangga sederhana.
       2. Jelaskan manfaatnya dari sudut pandang perkembangan saraf atau otot.
+      3. Sesuaikan dengan nuansa usia spesifik (misal: jika hampir ganti bulan, berikan tantangan transisi).
       
       Bahasa Indonesia.`,
       config: config
@@ -69,16 +72,29 @@ export const generateActivities = async (
       return JSON.parse(response.text) as Activity[];
     }
   } catch (error) {
-    // Fallback logic standard
-    try {
-        const fallbackResponse = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: `Buatkan 3 aktivitas stimulasi bayi usia ${ageContext} untuk melatih ${focusArea}. Output JSON array. Bahasa Indonesia.`,
-            config: { responseMimeType: "application/json", responseSchema: activitySchema }
-        });
-        if (fallbackResponse.text) return JSON.parse(fallbackResponse.text);
-    } catch (e) { console.error(e); }
+    console.warn("Thinking mode failed, falling back to standard model:", error);
   }
+
+  // Strategy 2: Fallback to Flash (Gemini 2.5) if Thinking fails/timeouts
+  try {
+    const fallbackResponse = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: `Buatkan 3 aktivitas stimulasi bayi usia ${ageContext} untuk melatih ${focusArea}. 
+      Gunakan alat sederhana di rumah. Berikan judul, durasi, alat, instruksi, manfaat, dan tips keamanan. 
+      Output JSON array. Bahasa Indonesia.`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: activitySchema
+      }
+    });
+
+    if (fallbackResponse.text) {
+      return JSON.parse(fallbackResponse.text) as Activity[];
+    }
+  } catch (fallbackError) {
+    console.error("Fallback generation failed:", fallbackError);
+  }
+
   return [];
 };
 
@@ -86,44 +102,10 @@ export const getMilestoneAdvice = async (ageMonths: number): Promise<string> => 
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: `Berikan satu paragraf singkat, hangat, dan menyemangati untuk orang tua tentang apa yang diharapkan secara perkembangan pada bayi usia ${ageMonths} bulan. Bahasa Indonesia.`,
+      contents: `Berikan satu paragraf singkat, hangat, dan menyemangati untuk orang tua tentang apa yang diharapkan secara perkembangan pada bayi usia ${ageMonths} bulan. Fokus pada milestones utama. Bahasa Indonesia.`,
     });
     return response.text || "Terjadi kesalahan saat memuat saran.";
   } catch (error) {
     return "Tidak dapat memuat saran saat ini.";
   }
 }
-
-// --- NEW: Chat Assistant Logic ---
-let chatSession: any = null;
-
-export const sendMessageToAssistant = async (
-  message: string, 
-  babyName: string, 
-  ageDisplay: string
-): Promise<string> => {
-  try {
-    if (!chatSession) {
-      chatSession = ai.chats.create({
-        model: "gemini-2.5-flash",
-        config: {
-          systemInstruction: `Anda adalah Dokter Anak AI yang ramah dan empatik bernama "Keinara Bot". 
-          Anda sedang berbicara dengan orang tua dari bayi bernama ${babyName}, yang saat ini berusia ${ageDisplay}.
-          
-          Tugas Anda:
-          1. Menjawab pertanyaan seputar tumbuh kembang, kesehatan ringan, nutrisi, dan pola tidur.
-          2. Selalu gunakan nada bicara yang menenangkan dan suportif.
-          3. Jika pertanyaan bersifat medis darurat (demam tinggi, sesak napas, cedera), Anda WAJIB menyarankan untuk segera ke dokter asli.
-          4. Jawaban harus ringkas namun informatif (maksimal 3 paragraf).
-          5. Gunakan Bahasa Indonesia yang baik dan gaul sedikit agar akrab (bunda/ayah).`,
-        },
-      });
-    }
-
-    const result = await chatSession.sendMessage({ message });
-    return result.text;
-  } catch (error) {
-    console.error("Chat Error", error);
-    return "Maaf Bunda, koneksi saya sedang gangguan. Bisa diulang lagi?";
-  }
-};
