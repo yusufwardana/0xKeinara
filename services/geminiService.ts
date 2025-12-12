@@ -36,8 +36,8 @@ export const generateActivities = async (
               items: { type: Type.STRING },
               description: "Langkah-langkah melakukan aktivitas"
             },
-            benefits: { type: Type.STRING, description: "Manfaat perkembangan bagi bayi" },
-            safetyTip: { type: Type.STRING, description: "Tips keamanan penting" }
+            benefits: { type: Type.STRING, description: "Manfaat perkembangan bagi bayi (jelaskan aspek neurosains/motorik)" },
+            safetyTip: { type: Type.STRING, description: "Tips keamanan spesifik untuk aktivitas ini" }
           },
           required: ["title", "duration", "materials", "instructions", "benefits", "safetyTip"]
         }
@@ -46,10 +46,16 @@ export const generateActivities = async (
 
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
-      contents: `Analisis tahap perkembangan bayi usia ${ageMonths} bulan secara mendalam.
+      contents: `Bertindaklah sebagai ahli perkembangan anak dan terapis okupasi pediatrik.
+      Analisis tahap perkembangan bayi usia ${ageMonths} bulan secara mendalam menggunakan kemampuan "Thinking Mode".
       Berikan 3 aktivitas stimulasi yang sangat spesifik, aman, dan edukatif dengan fokus pada ${focusArea}.
-      Gunakan penalaran "Thinking Mode" untuk memastikan aktivitas benar-benar sesuai dengan kemampuan motorik dan kognitif bayi pada bulan ke-${ageMonths}, jangan berikan aktivitas yang terlalu sulit atau terlalu mudah.
-      Pastikan instruksi jelas dan menggunakan barang-barang rumah tangga yang sederhana. Bahasa Indonesia.`,
+      
+      Panduan:
+      1. Aktivitas harus menggunakan barang rumah tangga sederhana.
+      2. Jelaskan manfaatnya dari sudut pandang perkembangan saraf atau otot (sederhana namun ilmiah).
+      3. Pastikan tingkat kesulitan tepat: menantang tapi bisa dicapai (zone of proximal development).
+      
+      Bahasa Indonesia.`,
       config: config
     });
 

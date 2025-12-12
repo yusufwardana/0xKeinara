@@ -7,10 +7,19 @@ interface Props {
   babyAge: number;
 }
 
+const LOADING_MESSAGES = [
+  "AI sedang menganalisis tahap perkembangan...",
+  "Merancang aktivitas yang aman dan edukatif...",
+  "Menyesuaikan dengan kemampuan motorik...",
+  "Memeriksa tips keamanan...",
+  "Menyusun instruksi permainan..."
+];
+
 const ActivityGenerator: React.FC<Props> = ({ babyAge }) => {
   const [selectedFocus, setSelectedFocus] = useState<FocusArea>(FocusArea.MOTOR_KASAR);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMsgIndex, setLoadingMsgIndex] = useState(0);
   const [error, setError] = useState('');
   
   // History State
@@ -29,6 +38,18 @@ const ActivityGenerator: React.FC<Props> = ({ babyAge }) => {
   useEffect(() => {
     localStorage.setItem('keinara_saved_activities', JSON.stringify(savedActivities));
   }, [savedActivities]);
+
+  // Cycle loading messages
+  useEffect(() => {
+    let interval: number;
+    if (loading) {
+      setLoadingMsgIndex(0);
+      interval = window.setInterval(() => {
+        setLoadingMsgIndex(prev => (prev + 1) % LOADING_MESSAGES.length);
+      }, 3000);
+    }
+    return () => clearInterval(interval);
+  }, [loading]);
 
   const handleGenerate = async () => {
     setLoading(true);
@@ -201,7 +222,7 @@ const ActivityGenerator: React.FC<Props> = ({ babyAge }) => {
             {loading ? (
               <>
                 <Brain className="w-5 h-5 animate-pulse" />
-                <span className="animate-pulse">AI Sedang Berpikir...</span>
+                <span className="animate-pulse w-48 text-left">{LOADING_MESSAGES[loadingMsgIndex]}</span>
               </>
             ) : (
               'Buat Rencana Main'
