@@ -1,23 +1,29 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import crypto from 'crypto';
 
-// --- CONFIGURATION ---
-// Multi-Key Fallback Strategy
+/**
+ * VERCEL SERVERLESS BACKEND
+ * Runtime: Node.js (Recommended for AI tasks due to higher timeout limits vs Edge)
+ */
+
+// --- 1. CONFIGURATION & SECRETS ---
 const API_KEYS = [
   process.env.API_KEY,
-  process.env.API_KEY_SECONDARY, // Optional backup key
-  process.env.API_KEY_TERTIARY   // Optional third key
+  process.env.API_KEY_SECONDARY,
+  process.env.API_KEY_TERTIARY
 ].filter(Boolean) as string[];
 
 const RATE_LIMIT_WINDOW = 60 * 1000; // 1 Minute
-const MAX_REQUESTS_PER_IP = 10;
+const MAX_REQUESTS_PER_IP = 15;
 const CACHE_TTL = 60 * 60 * 1000; // 1 Hour
 
-// --- IN-MEMORY STORAGE (Stateless-friendly but persistent on warm containers) ---
+// --- 2. IN-MEMORY STORAGE (Stateless-friendly) ---
+// Note: In a real serverless scaling scenario, use Redis (e.g., Vercel KV / Upstash)
 const rateLimitMap = new Map<string, { count: number; startTime: number }>();
 const cacheMap = new Map<string, { data: any; timestamp: number }>();
+const jobQueue = new Map<string, { status: 'queued' | 'processing' | 'done' | 'failed', result?: any, createdAt: number }>();
 
-// --- TYPES & SCHEMAS ---
+// --- 3. SCHEMAS ---
 const activitySchema = {
   type: Type.ARRAY,
   items: {
@@ -34,10 +40,13 @@ const activitySchema = {
   }
 };
 
-// --- HELPER FUNCTIONS ---
+// --- 4. HELPER FUNCTIONS ---
 
-// 1. Rate Limiter
-function checkRateLimit(ip: string) {
+function getClientIP(req: any): string {
+  return req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+}
+
+function checkRateLimit(ip: string): boolean {
   const now = Date.now();
   const record = rateLimitMap.get(ip) || { count: 0, startTime: now };
 
@@ -52,13 +61,16 @@ function checkRateLimit(ip: string) {
   return record.count <= MAX_REQUESTS_PER_IP;
 }
 
-// 2. Cache Key Generator
 function generateCacheKey(task: string, payload: any): string {
+  // Hash the payload to create a consistent key
   const str = `${task}-${JSON.stringify(payload)}`;
   return crypto.createHash('sha256').update(str).digest('hex');
 }
 
-// 3. AI Client with Rotation
+/**
+ * 5. GEMINI API CLIENT WITH FALLBACK
+ * Automatically rotates keys on 429 (Rate Limit) or 5xx errors.
+ */
 async function callGeminiWithFallback(modelName: string, prompt: string, config: any) {
   let lastError;
 
@@ -70,107 +82,150 @@ async function callGeminiWithFallback(modelName: string, prompt: string, config:
         contents: prompt,
         config: config
       });
-      
-      // Success? Return immediately
       return response;
     } catch (error: any) {
+      console.warn(`[Gemini] Key ending in ...${apiKey.slice(-4)} failed: ${error.message}`);
       lastError = error;
-      console.warn(`[Gemini Backend] Key failed: ${apiKey.substring(0, 5)}... Reason: ${error.message}`);
       
-      // Only rotate on Rate Limit (429) or Service Unavailable (503)
-      // If it's a Bad Request (400), rotation won't help.
-      if (!error.message.includes('429') && !error.message.includes('503')) {
-        throw error;
-      }
+      // Stop rotation if error is User's fault (400)
+      if (error.message.includes('400')) break;
+      
+      // Continue to next key if error is 429 or 5xx
     }
   }
   throw lastError;
 }
 
-// --- MAIN HANDLER (Vercel Format) ---
-export default async function handler(request: Request) {
-  if (request.method !== 'POST') {
-    return new Response('Method Not Allowed', { status: 405 });
+/**
+ * 6. ASYNC JOB WORKER (Simulation)
+ * In production, this would be a separate Vercel Function triggered by QStash.
+ */
+async function processAsyncJob(jobId: string, payload: any) {
+    console.log(`[Worker] Starting job ${jobId}`);
+    jobQueue.set(jobId, { status: 'processing', createdAt: Date.now() });
+    
+    // Simulate heavy processing delay (e.g. generating full report PDF content)
+    setTimeout(() => {
+        jobQueue.set(jobId, { 
+            status: 'done', 
+            result: { message: "Laporan perkembangan detail berhasil dibuat.", pages: 5 },
+            createdAt: Date.now() 
+        });
+        console.log(`[Worker] Job ${jobId} finished`);
+    }, 5000);
+}
+
+// --- 7. MAIN HANDLER (Node.js Signature) ---
+export default async function handler(req: any, res: any) {
+  // CORS Headers
+  res.setHeader('Access-Control-Allow-Credentials', true);
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
+
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
   }
 
-  // 1. Rate Limiting Check
-  // Note: specific header depends on Vercel/Proxy setup, fallback to arbitrary string for dev
-  const ip = request.headers.get('x-forwarded-for') || 'unknown-client';
-  if (!checkRateLimit(ip)) {
-    return new Response(JSON.stringify({ error: 'Too many requests. Please wait a minute.' }), {
-      status: 429,
-      headers: { 'Content-Type': 'application/json' }
-    });
+  if (req.method !== 'POST' && req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method Not Allowed' });
+  }
+
+  // A. Rate Limit Check
+  const clientIP = getClientIP(req);
+  if (!checkRateLimit(clientIP)) {
+    return res.status(429).json({ error: 'Rate limit exceeded. Please wait a moment.' });
   }
 
   try {
-    const body = await request.json();
-    const { task, payload } = body;
+    // B. Job Status Check (GET)
+    if (req.method === 'GET') {
+        const { jobId } = req.query;
+        if (!jobId || !jobQueue.has(jobId)) {
+            return res.status(404).json({ error: 'Job not found' });
+        }
+        return res.status(200).json(jobQueue.get(jobId));
+    }
 
-    // 2. Cache Check (Before processing)
+    // C. Task Processing (POST)
+    const { task, payload } = req.body;
+
+    // 1. Check Cache (Read-Through)
     const cacheKey = generateCacheKey(task, payload);
     const cached = cacheMap.get(cacheKey);
     if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
-      console.log('[Cache] Hit:', cacheKey);
-      return new Response(JSON.stringify(cached.data), {
-        headers: { 'Content-Type': 'application/json', 'X-Cache': 'HIT' }
-      });
+       console.log(`[Cache] HIT for ${task}`);
+       res.setHeader('X-Cache', 'HIT');
+       return res.status(200).json(cached.data);
     }
 
+    // 2. Task Routing
+    if (task === 'heavy_job') {
+        // --- QUEUE PATTERN ---
+        // For long running tasks, return 202 immediately
+        const jobId = crypto.randomUUID();
+        jobQueue.set(jobId, { status: 'queued', createdAt: Date.now() });
+        
+        // Trigger worker (Fire and Forget in this context, or await if strictly Serverless)
+        // Note: In pure Vercel without background functions, we must use `waitUntil` or accept that
+        // the function needs to stay alive. Here we simulate the trigger.
+        processAsyncJob(jobId, payload);
+        
+        return res.status(202).json({ 
+            status: 'queued', 
+            jobId, 
+            message: 'Tugas sedang diproses di background.' 
+        });
+    }
+
+    // --- REALTIME TASKS ---
     let resultData;
 
-    // 3. Task Router (Server-side Prompt Construction)
     if (task === 'activities') {
       const { ageContext, focusArea } = payload;
       const prompt = `Bertindaklah sebagai ahli perkembangan anak.
       Subjek: Bayi usia ${ageContext}.
       Tugas: Buat 3 rekomendasi aktivitas stimulasi untuk *hari ini* dengan fokus: ${focusArea}.
       Syarat: Gunakan barang rumah tangga sederhana. Aman. Bahasa Indonesia.
-      Output JSON only.`;
+      Output: Array of JSON objects.`;
       
       const response = await callGeminiWithFallback('gemini-2.5-flash', prompt, {
         responseMimeType: "application/json",
         responseSchema: activitySchema
       });
-      
       resultData = JSON.parse(response.text || "[]");
 
     } else if (task === 'milestone_advice') {
       const { ageMonths } = payload;
-      const prompt = `Berikan satu paragraf singkat, hangat, dan menyemangati untuk orang tua tentang apa yang diharapkan secara perkembangan pada bayi usia ${ageMonths} bulan. Bahasa Indonesia.`;
-      
+      const prompt = `Berikan satu paragraf singkat (maks 50 kata), hangat, untuk orang tua tentang milestone bayi ${ageMonths} bulan. Bahasa Indonesia.`;
       const response = await callGeminiWithFallback('gemini-2.5-flash', prompt, {});
       resultData = { text: response.text };
 
     } else if (task === 'chat') {
-      // For chat, we don't cache as strictly, or we cache based on last user message
-      const { message, babyName, ageDisplay, history } = payload;
-      // Note: In a real app, 'history' should be managed carefully to avoid token limits
-      const prompt = `System: Anda adalah Dokter Anak AI ramah bernama "Keinara Bot". Bayi: ${babyName}, Usia: ${ageDisplay}. Jawab ringkas, suportif, Bahasa Indonesia.
+      const { message, babyName, ageDisplay } = payload;
+      const prompt = `System: Kamu adalah Dokter Kecil AI. Bayi: ${babyName} (${ageDisplay}). Jawab pertanyaan user dengan ramah dan suportif. Bahasa Indonesia.
       User: ${message}`;
-      
       const response = await callGeminiWithFallback('gemini-2.5-flash', prompt, {});
       resultData = { text: response.text };
 
     } else {
-      return new Response(JSON.stringify({ error: 'Invalid task' }), { status: 400 });
+        return res.status(400).json({ error: 'Unknown task' });
     }
 
-    // 4. Save to Cache
-    // Don't cache chat heavily, or implement specific logic. For now, we cache everything.
-    if (task !== 'chat') { 
+    // 3. Write Cache
+    if (task !== 'chat') {
         cacheMap.set(cacheKey, { data: resultData, timestamp: Date.now() });
     }
 
-    return new Response(JSON.stringify(resultData), {
-      headers: { 'Content-Type': 'application/json', 'X-Cache': 'MISS' }
-    });
+    res.setHeader('X-Cache', 'MISS');
+    return res.status(200).json(resultData);
 
   } catch (error: any) {
-    console.error('[API Error]', error);
-    return new Response(JSON.stringify({ error: 'Internal Server Error', details: error.message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
+    console.error('[API Internal Error]', error);
+    return res.status(500).json({ 
+        error: 'Internal Server Error', 
+        details: error.message 
     });
   }
 }
