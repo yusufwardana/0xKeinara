@@ -28,3 +28,11 @@ export interface VisualMode {
   type: 'high-contrast' | 'tracking' | 'colors';
   description: string;
 }
+
+export interface GrowthRecord {
+  id: string;
+  date: string;
+  ageMonths: number;
+  weight: number; // kg
+  height: number; // cm
+}

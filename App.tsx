@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Baby, Activity as ActivityIcon, ListChecks, Eye, Settings, Calendar, User } from 'lucide-react';
+import { Baby, Activity as ActivityIcon, ListChecks, Eye, Settings, Calendar, User, Ruler, Weight } from 'lucide-react';
 import ActivityGenerator from './components/ActivityGenerator';
 import VisualStimulator from './components/VisualStimulator';
 import MilestoneTracker from './components/MilestoneTracker';
 import { calculateAge, AgeDetail } from './utils/ageCalculator';
+import { GrowthRecord } from './types';
 
 type View = 'activities' | 'visual' | 'milestones';
 
@@ -13,6 +14,8 @@ const App: React.FC = () => {
   // Profile State
   const [babyName, setBabyName] = useState('Keinara');
   const [birthDate, setBirthDate] = useState<string>('');
+  const [initialWeight, setInitialWeight] = useState<string>('');
+  const [initialHeight, setInitialHeight] = useState<string>('');
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [ageDetail, setAgeDetail] = useState<AgeDetail>({ months: 6, days: 0, totalDays: 180, display: '6 Bulan' });
 
@@ -36,6 +39,23 @@ const App: React.FC = () => {
     localStorage.setItem('keinara_profile_name', babyName);
     localStorage.setItem('keinara_profile_dob', birthDate);
     setAgeDetail(calculateAge(birthDate));
+    
+    // If weight/height provided during first setup, save as a record
+    if (initialWeight && initialHeight) {
+        const existingRecords = localStorage.getItem('keinara_growth_records');
+        if (!existingRecords) {
+            const ageInfo = calculateAge(birthDate);
+            const initialRecord: GrowthRecord = {
+                id: Date.now().toString(),
+                date: new Date().toISOString().split('T')[0],
+                ageMonths: ageInfo.months,
+                weight: parseFloat(initialWeight),
+                height: parseFloat(initialHeight)
+            };
+            localStorage.setItem('keinara_growth_records', JSON.stringify([initialRecord]));
+        }
+    }
+    
     setIsEditingProfile(false);
   };
 
@@ -45,13 +65,13 @@ const App: React.FC = () => {
       {/* Profile Modal */}
       {isEditingProfile && (
         <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-xl p-8 max-w-sm w-full">
+          <div className="bg-white rounded-2xl shadow-xl p-8 max-w-sm w-full max-h-[90vh] overflow-y-auto">
             <div className="text-center mb-6">
               <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Baby className="w-8 h-8 text-blue-600" />
               </div>
               <h2 className="text-2xl font-bold text-gray-800">Profil Si Kecil</h2>
-              <p className="text-gray-500 text-sm">Kami butuh data ini untuk menghitung usia presisi.</p>
+              <p className="text-gray-500 text-sm">Data untuk personalisasi aktivitas & grafik.</p>
             </div>
             
             <form onSubmit={handleSaveProfile} className="space-y-4">
@@ -82,6 +102,38 @@ const App: React.FC = () => {
                     className="w-full pl-9 pr-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-400 outline-none"
                   />
                 </div>
+              </div>
+
+              {/* Optional: Only show for initial setup if no records exist */}
+              <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Berat Saat Ini (kg)</label>
+                    <div className="relative">
+                      <Weight className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400" />
+                      <input 
+                        type="number" 
+                        step="0.01"
+                        value={initialWeight}
+                        onChange={(e) => setInitialWeight(e.target.value)}
+                        className="w-full pl-8 pr-2 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-400 outline-none text-sm"
+                        placeholder="0.0"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Tinggi Saat Ini (cm)</label>
+                    <div className="relative">
+                      <Ruler className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400" />
+                      <input 
+                        type="number" 
+                        step="0.1"
+                        value={initialHeight}
+                        onChange={(e) => setInitialHeight(e.target.value)}
+                        className="w-full pl-8 pr-2 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-400 outline-none text-sm"
+                        placeholder="0.0"
+                      />
+                    </div>
+                  </div>
               </div>
 
               <button 
@@ -195,7 +247,7 @@ const App: React.FC = () => {
             className={`flex flex-col items-center gap-1 ${currentView === 'milestones' ? 'text-green-600' : 'text-gray-400'}`}
           >
             <ListChecks className="w-6 h-6" />
-            <span className="text-xs font-medium">Milestone</span>
+            <span className="text-xs font-medium">Jurnal</span>
           </button>
         </div>
       </nav>
@@ -218,7 +270,7 @@ const App: React.FC = () => {
             onClick={() => setCurrentView('milestones')}
             className={`px-6 py-2 rounded-full font-medium transition-colors ${currentView === 'milestones' ? 'bg-green-100 text-green-700' : 'text-gray-600 hover:bg-gray-50'}`}
           >
-            Milestone
+            Jurnal
           </button>
       </div>
     </div>
