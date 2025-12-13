@@ -71,7 +71,7 @@ function generateCacheKey(task: string, payload: any): string {
  * 5. GEMINI API CLIENT WITH FALLBACK
  * Automatically rotates keys on 429 (Rate Limit) or 5xx errors.
  */
-async function callGeminiWithFallback(modelName: string, prompt: string, config: any) {
+async function callGeminiWithFallback(modelName: string, promptParts: any, config: any) {
   let lastError;
 
   for (const apiKey of API_KEYS) {
@@ -79,7 +79,7 @@ async function callGeminiWithFallback(modelName: string, prompt: string, config:
       const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
         model: modelName,
-        contents: prompt,
+        contents: promptParts, // Modified to accept complex contents (text + image)
         config: config
       });
       return response;
@@ -152,12 +152,18 @@ export default async function handler(req: any, res: any) {
     const { task, payload } = req.body;
 
     // 1. Check Cache (Read-Through)
-    const cacheKey = generateCacheKey(task, payload);
-    const cached = cacheMap.get(cacheKey);
-    if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
-       console.log(`[Cache] HIT for ${task}`);
-       res.setHeader('X-Cache', 'HIT');
-       return res.status(200).json(cached.data);
+    // IMPORTANT: We do NOT cache requests that include images (too large/variable)
+    let cached = null;
+    const hasImage = payload.imageBase64 && payload.imageBase64.length > 0;
+    
+    if (!hasImage) {
+        const cacheKey = generateCacheKey(task, payload);
+        cached = cacheMap.get(cacheKey);
+        if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+            console.log(`[Cache] HIT for ${task}`);
+            res.setHeader('X-Cache', 'HIT');
+            return res.status(200).json(cached.data);
+        }
     }
 
     // 2. Task Routing
@@ -183,14 +189,34 @@ export default async function handler(req: any, res: any) {
     let resultData;
 
     if (task === 'activities') {
-      const { ageContext, focusArea } = payload;
-      const prompt = `Bertindaklah sebagai ahli perkembangan anak.
+      const { ageContext, focusArea, imageBase64 } = payload;
+      
+      const systemPrompt = `Bertindaklah sebagai ahli perkembangan anak.
       Subjek: Bayi usia ${ageContext}.
       Tugas: Buat 3 rekomendasi aktivitas stimulasi untuk *hari ini* dengan fokus: ${focusArea}.
-      Syarat: Gunakan barang rumah tangga sederhana. Aman. Bahasa Indonesia.
-      Output: Array of JSON objects.`;
+      Syarat: Aman. Bahasa Indonesia. Output JSON only.`;
+
+      const promptParts: any = { parts: [] };
       
-      const response = await callGeminiWithFallback('gemini-2.5-flash', prompt, {
+      // Add Image if exists
+      if (imageBase64) {
+          promptParts.parts.push({
+              inlineData: {
+                  mimeType: "image/jpeg",
+                  data: imageBase64
+              }
+          });
+          promptParts.parts.push({
+              text: `${systemPrompt} 
+              KHUSUS: Analisis gambar yang saya kirim. Gunakan objek/mainan/lingkungan dalam foto tersebut sebagai alat utama aktivitas.`
+          });
+      } else {
+          promptParts.parts.push({
+              text: `${systemPrompt} Gunakan barang rumah tangga sederhana.`
+          });
+      }
+      
+      const response = await callGeminiWithFallback('gemini-2.5-flash', promptParts, {
         responseMimeType: "application/json",
         responseSchema: activitySchema
       });
@@ -213,8 +239,9 @@ export default async function handler(req: any, res: any) {
         return res.status(400).json({ error: 'Unknown task' });
     }
 
-    // 3. Write Cache
-    if (task !== 'chat') {
+    // 3. Write Cache (Only for text-only requests)
+    if (task !== 'chat' && !hasImage) {
+        const cacheKey = generateCacheKey(task, payload);
         cacheMap.set(cacheKey, { data: resultData, timestamp: Date.now() });
     }
 

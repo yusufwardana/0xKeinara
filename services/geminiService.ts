@@ -27,12 +27,17 @@ async function callBackendAPI(task: string, payload: any) {
 export const generateActivities = async (
   ageMonths: number,
   focusArea: FocusArea,
-  exactAgeDisplay: string = "" 
+  exactAgeDisplay: string = "",
+  imageBase64: string | null = null
 ): Promise<Activity[]> => {
   const ageContext = exactAgeDisplay ? `tepatnya ${exactAgeDisplay}` : `${ageMonths} bulan`;
   
   try {
-    const data = await callBackendAPI('activities', { ageContext, focusArea });
+    const data = await callBackendAPI('activities', { 
+        ageContext, 
+        focusArea,
+        imageBase64 // Optional: Send image data to backend
+    });
     return Array.isArray(data) ? data : [];
   } catch (error) {
     // Return empty array to trigger UI error message

@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Activity, FocusArea } from '../types';
 import { generateActivities } from '../services/geminiService';
-import { Sparkles, BookOpen, Clock, ShieldCheck, Bookmark, History, Trash2, ArrowLeft, Brain } from 'lucide-react';
+import { Sparkles, BookOpen, Clock, ShieldCheck, Bookmark, History, Trash2, ArrowLeft, Brain, Camera, X, Image as ImageIcon } from 'lucide-react';
 
 interface Props {
   babyAge: number;
@@ -9,10 +9,10 @@ interface Props {
 }
 
 const LOADING_MESSAGES = [
-  "AI sedang menghitung usia presisi...",
-  "Menganalisis kebutuhan hari ini...",
-  "Merancang aktivitas yang aman...",
-  "Menyesuaikan dengan motorik halus...",
+  "AI sedang melihat foto mainan...",
+  "Menganalisis objek untuk bayi...",
+  "Merancang aktivitas aman & seru...",
+  "Menyesuaikan dengan motorik...",
   "Menyusun instruksi permainan..."
 ];
 
@@ -22,6 +22,10 @@ const ActivityGenerator: React.FC<Props> = ({ babyAge, exactAgeDisplay }) => {
   const [loading, setLoading] = useState(false);
   const [loadingMsgIndex, setLoadingMsgIndex] = useState(0);
   const [error, setError] = useState('');
+  
+  // Image Upload State
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   
   // History State
   const [savedActivities, setSavedActivities] = useState<Activity[]>([]);
@@ -52,13 +56,72 @@ const ActivityGenerator: React.FC<Props> = ({ babyAge, exactAgeDisplay }) => {
     return () => clearInterval(interval);
   }, [loading]);
 
+  // --- IMAGE HANDLING LOGIC ---
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Basic validation
+      if (file.size > 5 * 1024 * 1024) {
+        alert("Ukuran foto maksimal 5MB ya, Bunda.");
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          // Resize image to max 800px width/height to save bandwidth & token
+          const canvas = document.createElement('canvas');
+          const MAX_SIZE = 800;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_SIZE) {
+              height *= MAX_SIZE / width;
+              width = MAX_SIZE;
+            }
+          } else {
+            if (height > MAX_SIZE) {
+              width *= MAX_SIZE / height;
+              height = MAX_SIZE;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          
+          // Convert to base64 jpeg with 0.7 quality
+          const resizedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+          // Remove prefix for API consumption (keeping it for display though)
+          setSelectedImage(resizedBase64);
+        };
+        img.src = e.target?.result as string;
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const clearImage = () => {
+    setSelectedImage(null);
+    if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+    }
+  };
+
   const handleGenerate = async () => {
     setLoading(true);
     setError('');
     setActivities([]);
     setShowHistory(false);
+    
+    // Prepare Base64 string for API (remove data:image/jpeg;base64, prefix)
+    const base64Data = selectedImage ? selectedImage.split(',')[1] : null;
+
     try {
-      const results = await generateActivities(babyAge, selectedFocus, exactAgeDisplay);
+      const results = await generateActivities(babyAge, selectedFocus, exactAgeDisplay, base64Data);
       if (results.length === 0) {
           setError("Maaf, gagal membuat rekomendasi. Coba lagi nanti.");
       }
@@ -215,6 +278,44 @@ const ActivityGenerator: React.FC<Props> = ({ babyAge, exactAgeDisplay }) => {
             </select>
           </div>
 
+          {/* Snap & Play Section */}
+          <div className="border border-dashed border-blue-300 rounded-xl p-4 bg-blue-50/50">
+             <div className="flex justify-between items-center mb-2">
+                 <label className="text-sm font-medium text-blue-800 flex items-center gap-2">
+                     <Camera className="w-4 h-4" /> Snap & Play (Opsional)
+                 </label>
+                 {selectedImage && (
+                     <button onClick={clearImage} className="text-xs text-red-500 hover:underline flex items-center gap-1">
+                         <X className="w-3 h-3" /> Hapus Foto
+                     </button>
+                 )}
+             </div>
+             
+             {!selectedImage ? (
+                 <div 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="cursor-pointer h-24 flex flex-col items-center justify-center text-blue-400 hover:text-blue-600 hover:bg-blue-100/50 transition-colors rounded-lg border-2 border-transparent hover:border-blue-200"
+                 >
+                     <ImageIcon className="w-8 h-8 mb-1" />
+                     <span className="text-xs">Foto mainan / barang di sekitar</span>
+                     <input 
+                        type="file" 
+                        accept="image/*" 
+                        ref={fileInputRef} 
+                        className="hidden" 
+                        onChange={handleImageUpload}
+                     />
+                 </div>
+             ) : (
+                 <div className="relative h-40 w-full rounded-lg overflow-hidden group">
+                     <img src={selectedImage} alt="Preview" className="w-full h-full object-cover" />
+                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                         <span className="text-white text-xs font-medium">Foto siap dianalisis AI</span>
+                     </div>
+                 </div>
+             )}
+          </div>
+
           <button
             onClick={handleGenerate}
             disabled={loading}
@@ -226,7 +327,7 @@ const ActivityGenerator: React.FC<Props> = ({ babyAge, exactAgeDisplay }) => {
                 <span className="animate-pulse w-48 text-left">{LOADING_MESSAGES[loadingMsgIndex]}</span>
               </>
             ) : (
-              'Buat Rencana Main Hari Ini'
+              selectedImage ? 'Analisis Foto & Buat Aktivitas' : 'Buat Rencana Main Hari Ini'
             )}
           </button>
         </div>
