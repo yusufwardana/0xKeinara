@@ -40,6 +40,21 @@ const activitySchema = {
   }
 };
 
+const recipeSchema = {
+  type: Type.ARRAY,
+  items: {
+    type: Type.OBJECT,
+    properties: {
+      name: { type: Type.STRING },
+      texture: { type: Type.STRING },
+      ingredients: { type: Type.ARRAY, items: { type: Type.STRING } },
+      steps: { type: Type.ARRAY, items: { type: Type.STRING } },
+      nutrition: { type: Type.STRING }
+    },
+    required: ["name", "texture", "ingredients", "steps", "nutrition"]
+  }
+};
+
 // --- 4. HELPER FUNCTIONS ---
 
 function getClientIP(req: any): string {
@@ -222,6 +237,20 @@ export default async function handler(req: any, res: any) {
       });
       resultData = JSON.parse(response.text || "[]");
 
+    } else if (task === 'mpasi_recipes') {
+        const { ageContext, ingredients } = payload;
+        const prompt = `Bertindak sebagai ahli gizi bayi (MPASI).
+        Subjek: Bayi usia ${ageContext}.
+        Bahan tersedia: ${ingredients}.
+        Tugas: Buat 2 resep MPASI lengkap yang lezat dan bergizi menggunakan bahan tersebut (boleh tambah bumbu dasar aman). Sesuaikan tekstur dengan usia.
+        Output: JSON Array.`;
+
+        const response = await callGeminiWithFallback('gemini-2.5-flash', prompt, {
+            responseMimeType: "application/json",
+            responseSchema: recipeSchema
+        });
+        resultData = JSON.parse(response.text || "[]");
+
     } else if (task === 'milestone_advice') {
       const { ageMonths } = payload;
       const prompt = `Berikan satu paragraf singkat (maks 50 kata), hangat, untuk orang tua tentang milestone bayi ${ageMonths} bulan. Bahasa Indonesia.`;
@@ -230,7 +259,10 @@ export default async function handler(req: any, res: any) {
 
     } else if (task === 'chat') {
       const { message, babyName, ageDisplay } = payload;
-      const prompt = `System: Kamu adalah Dokter Kecil AI. Bayi: ${babyName} (${ageDisplay}). Jawab pertanyaan user dengan ramah dan suportif. Bahasa Indonesia.
+      const prompt = `System: Kamu adalah Dokter Kecil AI, asisten parenting ramah & empatik. 
+      Profil Bayi: ${babyName}, Usia: ${ageDisplay}.
+      Tugas: Jawab pertanyaan user singkat, padat, suportif. Jika masalah medis serius, sarankan ke dokter asli.
+      Bahasa: Indonesia santai namun sopan.
       User: ${message}`;
       const response = await callGeminiWithFallback('gemini-2.5-flash', prompt, {});
       resultData = { text: response.text };

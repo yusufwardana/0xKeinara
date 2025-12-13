@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Baby, Activity as ActivityIcon, ListChecks, Eye, Settings, Calendar, User, Ruler, Weight } from 'lucide-react';
+import { Baby, Activity as ActivityIcon, ListChecks, Eye, Settings, Calendar, User, Ruler, Weight, Utensils } from 'lucide-react';
 import ActivityGenerator from './components/ActivityGenerator';
 import VisualStimulator from './components/VisualStimulator';
 import MilestoneTracker from './components/MilestoneTracker';
+import MpasiChef from './components/MpasiChef';
+import ChatAssistant from './components/ChatAssistant';
 import { calculateAge, AgeDetail } from './utils/ageCalculator';
 import { GrowthRecord } from './types';
 
-type View = 'activities' | 'visual' | 'milestones';
+type View = 'activities' | 'visual' | 'milestones' | 'mpasi';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('activities');
@@ -60,7 +62,10 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#fdfbf7] text-gray-800 pb-24 md:pb-0">
+    <div className="min-h-screen bg-[#fdfbf7] text-gray-800 pb-24 md:pb-0 relative">
+      
+      {/* GLOBAL CHAT ASSISTANT */}
+      <ChatAssistant babyName={babyName} ageDisplay={ageDetail.display} />
       
       {/* Profile Modal */}
       {isEditingProfile && (
@@ -159,7 +164,7 @@ const App: React.FC = () => {
       )}
 
       {/* Header */}
-      <header className="bg-white sticky top-0 z-50 border-b border-gray-100 shadow-sm">
+      <header className="bg-white sticky top-0 z-40 border-b border-gray-100 shadow-sm">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="bg-blue-100 p-2 rounded-xl">
@@ -220,34 +225,52 @@ const App: React.FC = () => {
               <MilestoneTracker babyAge={ageDetail.months || 3} />
             </div>
           )}
+
+          {currentView === 'mpasi' && (
+             <div>
+               <div className="mb-6">
+                  <h2 className="text-2xl font-bold text-gray-800">Chef MPASI</h2>
+                  <p className="text-gray-500">Buat resep lezat dari bahan yang ada di kulkas Bunda.</p>
+              </div>
+              <MpasiChef babyAge={ageDetail.months || 3} />
+            </div>
+          )}
         </div>
       </main>
 
       {/* Bottom Navigation (Mobile First) */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 py-3 md:hidden shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-40">
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 md:hidden shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-40">
         <div className="flex justify-between items-center max-w-sm mx-auto">
           <button 
             onClick={() => setCurrentView('activities')}
             className={`flex flex-col items-center gap-1 ${currentView === 'activities' ? 'text-blue-600' : 'text-gray-400'}`}
           >
-            <ActivityIcon className="w-6 h-6" />
-            <span className="text-xs font-medium">Aktivitas</span>
+            <ActivityIcon className="w-5 h-5" />
+            <span className="text-[10px] font-medium">Main</span>
           </button>
           
           <button 
             onClick={() => setCurrentView('visual')}
-            className={`flex flex-col items-center gap-1 ${currentView === 'visual' ? 'text-orange-600' : 'text-gray-400'}`}
+            className={`flex flex-col items-center gap-1 ${currentView === 'visual' ? 'text-blue-600' : 'text-gray-400'}`}
           >
-            <Eye className="w-6 h-6" />
-            <span className="text-xs font-medium">Visual</span>
+            <Eye className="w-5 h-5" />
+            <span className="text-[10px] font-medium">Visual</span>
+          </button>
+
+          <button 
+            onClick={() => setCurrentView('mpasi')}
+            className={`flex flex-col items-center gap-1 ${currentView === 'mpasi' ? 'text-blue-600' : 'text-gray-400'}`}
+          >
+            <Utensils className="w-5 h-5" />
+            <span className="text-[10px] font-medium">MPASI</span>
           </button>
 
           <button 
             onClick={() => setCurrentView('milestones')}
-            className={`flex flex-col items-center gap-1 ${currentView === 'milestones' ? 'text-green-600' : 'text-gray-400'}`}
+            className={`flex flex-col items-center gap-1 ${currentView === 'milestones' ? 'text-blue-600' : 'text-gray-400'}`}
           >
-            <ListChecks className="w-6 h-6" />
-            <span className="text-xs font-medium">Jurnal</span>
+            <ListChecks className="w-5 h-5" />
+            <span className="text-[10px] font-medium">Jurnal</span>
           </button>
         </div>
       </nav>
@@ -256,21 +279,27 @@ const App: React.FC = () => {
       <div className="hidden md:flex fixed top-24 left-1/2 -translate-x-1/2 bg-white shadow-lg rounded-full border border-gray-200 p-1.5 z-40">
          <button 
             onClick={() => setCurrentView('activities')}
-            className={`px-6 py-2 rounded-full font-medium transition-colors ${currentView === 'activities' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}
+            className={`px-5 py-2 rounded-full font-medium transition-colors text-sm flex items-center gap-2 ${currentView === 'activities' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}
           >
-            Aktivitas
+            <ActivityIcon className="w-4 h-4" /> Aktivitas
           </button>
           <button 
             onClick={() => setCurrentView('visual')}
-            className={`px-6 py-2 rounded-full font-medium transition-colors ${currentView === 'visual' ? 'bg-orange-100 text-orange-700' : 'text-gray-600 hover:bg-gray-50'}`}
+            className={`px-5 py-2 rounded-full font-medium transition-colors text-sm flex items-center gap-2 ${currentView === 'visual' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}
           >
-            Visual
+            <Eye className="w-4 h-4" /> Visual
+          </button>
+           <button 
+            onClick={() => setCurrentView('mpasi')}
+            className={`px-5 py-2 rounded-full font-medium transition-colors text-sm flex items-center gap-2 ${currentView === 'mpasi' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}
+          >
+            <Utensils className="w-4 h-4" /> MPASI
           </button>
           <button 
             onClick={() => setCurrentView('milestones')}
-            className={`px-6 py-2 rounded-full font-medium transition-colors ${currentView === 'milestones' ? 'bg-green-100 text-green-700' : 'text-gray-600 hover:bg-gray-50'}`}
+            className={`px-5 py-2 rounded-full font-medium transition-colors text-sm flex items-center gap-2 ${currentView === 'milestones' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}
           >
-            Jurnal
+            <ListChecks className="w-4 h-4" /> Jurnal
           </button>
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { Activity, FocusArea } from "../types";
+import { Activity, FocusArea, Recipe } from "../types";
 
 // --- API CLIENT ---
 async function callBackendAPI(task: string, payload: any) {
@@ -43,6 +43,21 @@ export const generateActivities = async (
     // Return empty array to trigger UI error message
     return [];
   }
+};
+
+export const generateRecipes = async (
+    ageMonths: number,
+    ingredients: string
+): Promise<Recipe[]> => {
+    try {
+        const data = await callBackendAPI('mpasi_recipes', {
+            ageContext: `${ageMonths} bulan`,
+            ingredients
+        });
+        return Array.isArray(data) ? data : [];
+    } catch (error) {
+        return [];
+    }
 };
 
 export const getMilestoneAdvice = async (ageMonths: number): Promise<string> => {

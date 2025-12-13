@@ -36,3 +36,11 @@ export interface GrowthRecord {
   weight: number; // kg
   height: number; // cm
 }
+
+export interface Recipe {
+  name: string;
+  texture: string;
+  ingredients: string[];
+  steps: string[];
+  nutrition: string;
+}
